@@ -548,8 +548,8 @@ server <- function(input, output, session){
                    tooltip = substitute(sprintf(
                      "%s, %s<br/>Answer count: %s</br>Mean parktime: %s<br/>Mean walktime: %s<br/>Forest (%%): %s",
                      id, nimi, answer_count, parktime_mean, walktime_mean, 
-                     ua_forest)),
-                   data_id = substitute(id))) +
+                     ua_forest)))) +#,
+                   #data_id = substitute(id))) + #this enables css events and lasso selection
       scale_fill_brewer(palette = brewerpal,
                         direction = -1,
                         name = legendname,
