@@ -8,6 +8,42 @@
 # 3.3.2020
 
 
+
+# Initialise
+library(onewaytests)
+library(car)
+library(plotrix)
+library(moments)
+library(rlang)
+
+
+CreateJenksColumn <- function(fortified, postal, datacol, newcolname, classes_n = 5) {
+  
+  # Use this function to create a column in fortified dataframe that can be
+  # used to portray Jenks breaks colouring in a ggplot map. Dplyr note: to
+  # enable parameters as column names in dplyr, apply !! and := for the left
+  # side and for the right side !!rlang::sym().
+  #
+  # Adapted from:
+  # https://medium.com/@traffordDataLab/lets-make-a-map-in-r-7bd1d9366098
+  
+  classes <- classInt::classIntervals(postal[, datacol], n = classes_n, 
+                                      style = "jenks")
+  result <- fortified %>%
+    mutate(!!newcolname := cut(!!rlang::sym(datacol), classes$brks, 
+                               include.lowest = T))
+  
+  # Reverse column values to enable rising values from bottom to top in ggplot.
+  # In ggplot, use scale_fill_brewer(direction = -1) with this operation to flip
+  # the legend.
+  result[, newcolname] = factor(result[, newcolname], 
+                                levels = rev(levels(result[, newcolname])))
+  
+  return(result)
+}
+
+
+
 SigTableToShiny <- function(sigTable, hasHeading) {
   
   # Use this function to show significance tables in Shiny. It will be useful

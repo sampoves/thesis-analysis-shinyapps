@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 9.3.2020
+# 15.3.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -18,9 +18,19 @@ library(shinythemes)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
+library(dygraphs)
+library(xts) 
+library(htmltools)
 library(rgdal)
 library(RColorBrewer)
+library(shinyjs)
+library(colormap)
+library(ggiraph)
+library(widgetframe)
+library(rgeos)
+library(classInt)
 library(mapproj)
+
 
 
 #### Preparation ####
@@ -29,6 +39,7 @@ library(mapproj)
 datapath <- "pythonshinyrecords.csv"
 suuraluepath <- "PKS_suuralue.kml"
 munsclippedpath <- "hcr_muns_clipped.shp"
+munspath <- "hcr_muns.shp"
 
 # Source functions and postal code variables
 source("app_funcs.R")
@@ -38,7 +49,6 @@ continuous <- c("parktime", "walktime")
 ordinal <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
              "subdiv") 
 supportcols <- c("X", "id", "timestamp", "ip")
-
 
 # Read in csv data. Define column types
 thesisdata <- read.csv(file = datapath,
@@ -181,6 +191,46 @@ centroids2[2, "long"] <- centroids2[2, "long"] - 0.04
 centroids2[13, "lat"] <- centroids2[13, "lat"] + 0.08
 centroids2[13, "long"] <- centroids2[13, "long"] + 0.05
 centroids2[16, "label"] <- ""
+
+
+
+### Interactive map for ShinyApp ----------------------------------------------- 
+# Created with the help of:
+# https://bhaskarvk.github.io/user2017.geodataviz/notebooks/03-Interactive-Maps.nb.html
+
+postal_path <- "pythonshinypostal.csv"
+postal <- read.csv(file = postal_path, 
+                   colClasses = c(posti_alue = "factor", kunta = "factor"),
+                   header = TRUE, encoding = "UTF-8", sep = ",")
+postal <- postal[, c(2, 3, 108:119)]
+
+crs <- sp::CRS("+init=epsg:3067")
+geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs)
+
+sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
+row.names(postal) <- postal[, 1]
+data <- SpatialPolygonsDataFrame(
+  SpatialPolygons(unlist(lapply(sp_tmp_ID, function(x) x@polygons)), 
+                  proj4string = crs), data = postal)
+data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id", 
+                by.y = 0)
+
+# Create jenks breaks columns
+data_f <- CreateJenksColumn(data_f, postal, "ua_forest", "jenks_ua_forest")
+data_f <- CreateJenksColumn(data_f, postal, "answer_count", "jenks_answer_count")
+data_f <- CreateJenksColumn(data_f, postal, "parktime_mean", "jenks_parktime")
+data_f <- CreateJenksColumn(data_f, postal, "walktime_mean", "jenks_walktime")
+
+# Get municipality borders
+muns <- readOGR(munspath)
+muns <- spTransform(muns, crs)
+
+# attempt to remove Espoo's inner ring, Kauniainen. Does not completely work,
+# a connecting line appears in ggplot despite using group parameter.
+#ring <- SpatialPolygons(list(Polygons(list(muns@polygons[[1]]@Polygons[[1]]), ID = 1)))
+#muns@polygons[1] <- ring@polygons
+
+munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
 
 
 
@@ -359,7 +409,7 @@ server <- function(input, output, session){
                             fill = get(barplotval))) +
       geom_bar(aes(y = stat(count)), position = "dodge") + 
       scale_y_continuous(breaks = seq(0, maximum, by = tick_interval),
-                         expand = expand_scale(mult = c(0, .1))) +
+                         expand = expansion(mult = c(0, .1))) +
       xlab(explanatorycol) +
       ylab(yax) +
       scale_fill_discrete(name = barplotval)
@@ -464,6 +514,60 @@ server <- function(input, output, session){
   },
   width = 720,
   height = 700)
+  
+  
+  ### Interactive map ####
+  output$interactive <- renderggiraph({
+    
+    if(input$karttacol == "jenks_ua_forest") {
+      brewerpal <- "YlGn"
+      legendname <- "Forest amount (%)"
+      
+    } else if (input$karttacol == "jenks_walktime") {
+      brewerpal <- "BuPu"
+      legendname <- "Walking time (min)"
+      
+    } else if (input$karttacol == "jenks_parktime") {
+      brewerpal <- "Oranges"
+      legendname <- "Parking time (min)"
+      
+    } else {
+      # answer_count
+      brewerpal <- "Reds"
+      legendname <- "Answer count"
+    }
+    
+    # Format map labels. Remove [, ], (, and ). Also add list dash
+    labels <- gsub("(])|(\\()|(\\[)", "", levels(data_f[, input$karttacol]))
+    labels <- gsub(",", " \U2012 ", labels)
+    
+    g <- ggplot(data_f) +
+      geom_polygon_interactive(
+        color = "black",
+        size = 0.2,
+        aes_string("long", "lat",
+                   group = "group", 
+                   fill = input$karttacol,
+                   tooltip = substitute(sprintf(
+                     "%s, %s<br/>Answer count: %s</br>Mean parktime: %s<br/>Mean walktime: %s<br/>Forest (%%): %s",
+                     id, nimi, answer_count, parktime_mean, walktime_mean, 
+                     ua_forest)))) +
+      scale_fill_brewer(palette = brewerpal,
+                        direction = -1,
+                        name = legendname,
+                        labels = labels) +
+      geom_polygon(data = munsf,
+                   aes(long, lat, group = group),
+                   linetype = "longdash",
+                   color = alpha("black", 0.6), 
+                   fill = "NA",
+                   size = 0.4) +
+      coord_fixed(ylim = c(6664000, 6700000))
+    
+    ggiraph(code = print(g), width_svg = 11, height_svg = 9, 
+            options = list(
+              opts_sizing(rescale = FALSE)))
+  })
 }
 
 ### ShinyApp UI elements ####
@@ -508,6 +612,9 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
         max-width: 80vh;
         width: 250px;
         z-index: 50;
+      }
+      .girafe_container_std {
+        text-align: left;
       }"
     ))
   ),                    
@@ -523,7 +630,8 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
       HTML("<a href='#levenelink'>Levene</a> &mdash;"),
       HTML("<a href='#anovalink'>ANOVA</a> &mdash;"),
       HTML("<a href='#brownlink'>Brown-Forsythe</a> &mdash;"),
-      HTML("<a href='#maplink'>Context map</a>"),
+      HTML("<a href='#maplink'>Context map</a> &mdash;"),
+      HTML("<a href='#intmaplink'>Interactive map</a>"),
       HTML("</div>"),
       
       # walktime or parktime
@@ -554,6 +662,11 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
         choiceNames = c("Item A", "Item B", "Item C"),
         choiceValues = c("a", "b", "c")),
 
+      selectInput("karttacol",
+                  "Select Jenks breaks parameter for the interactive map",
+                  c("jenks_answer_count", "jenks_parktime", 
+                    "jenks_walktime", "jenks_ua_forest")),
+      
       checkboxGroupInput(
         "subdivGroup",
         HTML("Select inactive subdivisions <p style='font-size: 9px'>",
@@ -620,6 +733,11 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
       # on top of the context map
       br(), br(), br(), br(), br(), br(), br(), br(), br(), br(), br(), br(),
       br(), br(), br(), hr(),
+      
+      HTML("<div id='intmaplink'</div>"),
+      h3("Survey results on research area map"),
+      ggiraphOutput("interactive"),
+      
       h3("Data providers"),
       HTML("<a https://hri.fi/data/dataset/paakaupunkiseudun-aluejakokartat>",
             "Municipality subdivisions</a>",
