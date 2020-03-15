@@ -18,9 +18,6 @@ library(shinythemes)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
-library(dygraphs)
-library(xts) 
-library(htmltools)
 library(rgdal)
 library(RColorBrewer)
 library(shinyjs)
@@ -551,7 +548,8 @@ server <- function(input, output, session){
                    tooltip = substitute(sprintf(
                      "%s, %s<br/>Answer count: %s</br>Mean parktime: %s<br/>Mean walktime: %s<br/>Forest (%%): %s",
                      id, nimi, answer_count, parktime_mean, walktime_mean, 
-                     ua_forest)))) +
+                     ua_forest)),
+                   data_id = substitute(id))) +
       scale_fill_brewer(palette = brewerpal,
                         direction = -1,
                         name = legendname,
@@ -562,9 +560,12 @@ server <- function(input, output, session){
                    color = alpha("black", 0.6), 
                    fill = "NA",
                    size = 0.4) +
-      coord_fixed(ylim = c(6664000, 6700000))
+      coord_fixed(ylim = c(6664000, 6700000)) +
+      theme(legend.title = element_text(size = 15),
+            legend.text = element_text(size = 14))
     
-    ggiraph(code = print(g), width_svg = 11, height_svg = 9, 
+    ggiraph(code = print(g), width_svg = 14, height_svg = 12,
+            #hover_css = "cursor:pointer;stroke-width:2px;stroke:black;stroke-opacity:0.6",
             options = list(
               opts_sizing(rescale = FALSE)))
   })
