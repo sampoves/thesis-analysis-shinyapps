@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 15.3.2020
+# 16.3.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -34,6 +34,7 @@ library(mapproj)
 
 # Important directories
 datapath <- "pythonshinyrecords.csv"
+postal_path <- "pythonshinypostal.csv"
 suuraluepath <- "PKS_suuralue.kml"
 munsclippedpath <- "hcr_muns_clipped.shp"
 munspath <- "hcr_muns.shp"
@@ -103,6 +104,8 @@ thesisdata <- subset(thesisdata, select = -c(index))
 # ShinyApp. Updating this map makes the app a bit more sluggish. Delete this
 # code if you get sufficiently annoyed with the sluggishness.
 suuralue <- readOGR(suuraluepath, use_iconv = TRUE, encoding = "UTF-8")
+
+# This preserves suuralue dataframe data
 suuralue_f <- merge(fortify(suuralue), as.data.frame(suuralue), by.x = "id", 
                     by.y = 0)
 
@@ -195,38 +198,29 @@ centroids2[16, "label"] <- ""
 # Created with the help of:
 # https://bhaskarvk.github.io/user2017.geodataviz/notebooks/03-Interactive-Maps.nb.html
 
-postal_path <- "pythonshinypostal.csv"
+# Get postal code area data calculated in Python. Contains some interesting
+# variables for visualisation
 postal <- read.csv(file = postal_path, 
                    colClasses = c(posti_alue = "factor", kunta = "factor"),
                    header = TRUE, encoding = "UTF-8", sep = ",")
 postal <- postal[, c(2, 3, 108:119)]
 
+# postal geometries are in well-known text format. Some processing is needed to
+# utilise these polygons in R.
 crs <- sp::CRS("+init=epsg:3067")
 geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs)
-
 sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
 row.names(postal) <- postal[, 1]
 data <- SpatialPolygonsDataFrame(
   SpatialPolygons(unlist(lapply(sp_tmp_ID, function(x) x@polygons)), 
                   proj4string = crs), data = postal)
+
 data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id", 
                 by.y = 0)
-
-# Create jenks breaks columns
-data_f <- CreateJenksColumn(data_f, postal, "ua_forest", "jenks_ua_forest")
-data_f <- CreateJenksColumn(data_f, postal, "answer_count", "jenks_answer_count")
-data_f <- CreateJenksColumn(data_f, postal, "parktime_mean", "jenks_parktime")
-data_f <- CreateJenksColumn(data_f, postal, "walktime_mean", "jenks_walktime")
 
 # Get municipality borders
 muns <- readOGR(munspath)
 muns <- spTransform(muns, crs)
-
-# attempt to remove Espoo's inner ring, Kauniainen. Does not completely work,
-# a connecting line appears in ggplot despite using group parameter.
-#ring <- SpatialPolygons(list(Polygons(list(muns@polygons[[1]]@Polygons[[1]]), ID = 1)))
-#muns@polygons[1] <- ring@polygons
-
 munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
 
 
@@ -357,18 +351,21 @@ server <- function(input, output, session){
     legendnames <- levels(unique(inputdata[[explanatorycol]]))
     
     # ggplot2 plotting. Rotate labels if enough classes
-    if(length(legendnames) > 5){
+    if(length(legendnames) > 5) {
       
       p <- ggplot(inputdata, aes_string(x = input$expl, y = input$resp)) + 
         geom_boxplot() + 
-        theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1))
+        theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+              axis.text = element_text(size = 12),
+              axis.title = element_text(size = 14))
     } else {
       
       p <- ggplot(inputdata, aes_string(x = input$expl, y = input$resp)) + 
-        geom_boxplot()
+        geom_boxplot() +
+        theme(axis.text = element_text(size = 12),
+              axis.title = element_text(size = 14))
     }
     p
-    
   })
 
   
@@ -399,7 +396,6 @@ server <- function(input, output, session){
       tick_interval <- 200
     }
     
-    # Draw ggplot2 plot
     plo <- 
       ggplot(inputdata, aes(x = get(explanatorycol), 
                             y = factor(get(barplotval)), 
@@ -409,9 +405,12 @@ server <- function(input, output, session){
                          expand = expansion(mult = c(0, .1))) +
       xlab(explanatorycol) +
       ylab(yax) +
-      scale_fill_discrete(name = barplotval)
-      theme(legend.position = "right")
-    
+      scale_fill_discrete(name = barplotval) +
+      theme(legend.position = "bottom",
+            legend.title = element_text(size = 15),
+            legend.text = element_text(size = 14),
+            axis.text = element_text(size = 12),
+            axis.title = element_text(size = 14))
     plo
   })
   
@@ -478,43 +477,69 @@ server <- function(input, output, session){
   })
   
   ### Context map ####
-  output$map <- renderPlot({
+  output$map <- renderggiraph({
     
     # Count active subdivs
     active_subdivs <- 23 - length(input$subdivGroup)
     
-    mapp <- ggplot() + 
-      geom_polygon(data = suuralue_f,
-                   aes(long, lat, group = group, fill = "#3d3d3d"),
-                   colour = NA) +
+    g2 <- ggplot() +
+      # Background grey subdivs appear when inactive subdivs present
       geom_polygon(
+        data = suuralue_f,
+        aes(long, lat, group = group, fill = "#3d3d3d"),
+        colour = NA) +
+      
+      # Subdivisions proper
+      geom_polygon_interactive(
         data = suuralue_f[!suuralue_f$Name %in% c(input$subdivGroup), ], 
+        size = 0.2,
         aes(long, lat, group = group, fill = color),
         colour = "grey") +
+      
+      # Municipality borders
       geom_polygon(
-        data = muns_clipped_f, 
-        aes(long, lat, group = group), 
-        fill = NA, 
-        colour = "black") +
+        data = muns_clipped_f,
+        aes(long, lat, group = group),
+        fill = NA,
+        color = "black",
+        size = 0.4) +
       coord_map(ylim = c(60.07, 60.42)) +
+      
+      # Legend contents
       scale_fill_identity(paste0("Currently active\nsubdivisions\n(", 
                                  active_subdivs, " out of 23)"), 
                           labels = suuralue_f$Name, breaks = suuralue_f$color, 
                           guide = "legend") +
-      with(centroids, annotate(geom = "text", x = long, y = lat, label = label, 
-                               size = 4)) +
+      
+      # Annotations. centroids2 is subdiv labels, centroids is municipality
+      # labels.
+      with(centroids, 
+           annotate(geom = "text", x = long, y = lat, label = label, size = 5,
+                    fontface = 2)) +
       with(centroids2[!centroids2$label %in% gsub(".* ", "", c(input$subdivGroup)), ], 
-           annotate(geom = "text", x = long, y = lat, label = label, size = 3)) +
-      theme(plot.margin = grid::unit(c(0,0,0,0), "mm"), 
+           annotate(geom = "text", x = long, y = lat, label = label, size = 4)) +
+      
+      # Tight layout and legend properties
+      theme(plot.margin = grid::unit(c(0, 0, 0, 0), "mm"),
+            legend.title = element_text(size = 15),
+            legend.text = element_text(size = 14),
             legend.position = "bottom")
-    mapp
-  },
-  width = 720,
-  height = 700)
+    
+    ggiraph(code = print(g2), width_svg = 14, height_svg = 12, 
+            options = list(
+              opts_sizing(rescale = FALSE)))
+  })
   
   
   ### Interactive map ####
   output$interactive <- renderggiraph({
+    
+    # Create jenks breaks columns here so that user gets the control of Jenks
+    # breaks classes
+    data_f <- CreateJenksColumn(data_f, postal, "ua_forest", "jenks_ua_forest", input$jenks_n)
+    data_f <- CreateJenksColumn(data_f, postal, "answer_count", "jenks_answer_count", input$jenks_n)
+    data_f <- CreateJenksColumn(data_f, postal, "parktime_mean", "jenks_parktime", input$jenks_n)
+    data_f <- CreateJenksColumn(data_f, postal, "walktime_mean", "jenks_walktime", input$jenks_n)
     
     if(input$karttacol == "jenks_ua_forest") {
       brewerpal <- "YlGn"
@@ -541,19 +566,24 @@ server <- function(input, output, session){
     g <- ggplot(data_f) +
       geom_polygon_interactive(
         color = "black",
-        size = 0.2,
+        size = 0.2,        
+        
+        # aes_string() is to facilitate interactive map tooltip creation
         aes_string("long", "lat",
                    group = "group", 
                    fill = input$karttacol,
                    tooltip = substitute(sprintf(
                      "%s, %s<br/>Answer count: %s</br>Mean parktime: %s<br/>Mean walktime: %s<br/>Forest (%%): %s",
                      id, nimi, answer_count, parktime_mean, walktime_mean, 
-                     ua_forest)))) +#,
-                   #data_id = substitute(id))) + #this enables css events and lasso selection
+                     ua_forest)))) +
+      
+      # Jenks classes colouring and labels
       scale_fill_brewer(palette = brewerpal,
                         direction = -1,
                         name = legendname,
                         labels = labels) +
+      
+      # Municipality borders
       geom_polygon(data = munsf,
                    aes(long, lat, group = group),
                    linetype = "longdash",
@@ -565,15 +595,19 @@ server <- function(input, output, session){
             legend.text = element_text(size = 14))
     
     ggiraph(code = print(g), width_svg = 14, height_svg = 12,
-            #hover_css = "cursor:pointer;stroke-width:2px;stroke:black;stroke-opacity:0.6",
             options = list(
               opts_sizing(rescale = FALSE)))
   })
 }
 
-### ShinyApp UI elements ####
-ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
+
+
+### ShinyApp UI elements ------------------------------------------------------- 
+ui <- shinyUI(fluidPage(
+  useShinyjs(),
+  theme = shinytheme("slate"),
   
+  ### ShinyApp UI CSS ---------------------------------------------------------- 
   # Edit various CSS features of the ShinyApp such as the Brown-Forsythe test 
   # box and sidebarPanel (form.well) width. sidebarPanel width setting is 
   # important because the long explanations would break it otherwise. Also
@@ -598,6 +632,10 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
       #boxplot, #barplot, #hist {
         max-width: 1000px;
       }
+      #resetSubdivs {
+        width: 100%;
+        padding: 8px 0px 8px 0px;
+      }
       #contents {
         border: 5px solid #2e3338;
         border-radius: 5px;
@@ -619,30 +657,31 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
       }"
     ))
   ),                    
-                     
+  
   titlePanel("Sampo Vesanen MSc thesis research survey results ShinyApp"),
   sidebarLayout(
     sidebarPanel(
       HTML("<div id='contents'>"),
-      HTML("<a href='#descrilink'>Descriptives</a> &mdash;"),
-      HTML("<a href='#histlink'>Histogram</a> &mdash;"),
-      HTML("<a href='#barplotlink'>Barplot</a> &mdash;"),
-      HTML("<a href='#boxplotlink'>Boxplot</a> &mdash;"),
-      HTML("<a href='#levenelink'>Levene</a> &mdash;"),
-      HTML("<a href='#anovalink'>ANOVA</a> &mdash;"),
-      HTML("<a href='#brownlink'>Brown-Forsythe</a> &mdash;"),
-      HTML("<a href='#maplink'>Context map</a> &mdash;"),
-      HTML("<a href='#intmaplink'>Interactive map</a>"),
+      HTML("<a href='#descrilink'>1 Descriptives</a> &mdash;"),
+      HTML("<a href='#histlink'>2 Histogram</a> &mdash;"),
+      HTML("<a href='#barplotlink'>3 Barplot</a> &mdash;"),
+      HTML("<a href='#boxplotlink'>4 Boxplot</a> &mdash;"),
+      HTML("<a href='#levenelink'>5 Levene</a> &mdash;"),
+      HTML("<a href='#anovalink'>6 ANOVA</a> &mdash;"),
+      HTML("<a href='#brownlink'>7 Brown-Forsythe</a> &mdash;"),
+      HTML("<a href='#maplink'>8 Context map</a> &mdash;"),
+      HTML("<a href='#intmaplink'>9 Interactive map</a>"),
       HTML("</div>"),
       
       # walktime or parktime
+      HTML("<div id='contents'>"),
       selectInput("resp", 
-                 "Response (continuous)",
-                 names(thesisdata[continuous])),
+                  "Response (continuous)",
+                  names(thesisdata[continuous])),
       # All others
       selectInput("expl",
-                 "Explanatory (ordinal)", 
-                 names(thesisdata[ordinal])),
+                  "Explanatory (ordinal)", 
+                  names(thesisdata[ordinal])),
       
       # Provide user possibility to see distribution of answers within the
       # ordinal variables.
@@ -652,41 +691,58 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
         condition = 
           "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
         selectInput(
-          "barplot", "Y axis for Distribution of ordinal variables",
+          "barplot", 
+          HTML("Y axis for Distribution of ordinal variables <p style='font-size: 9px'>",
+               "(3 Distribution of ordinal variables)</p>"),
           names(thesisdata[c("zipcode", "likert", "walktime")]),
-      )),
+        )),
       
       # These are changed with the observer function
       checkboxGroupInput(
         "checkGroup", 
-        "Select inactive groups",
+        "Select inactive groups in current explanatory variable",
         choiceNames = c("Item A", "Item B", "Item C"),
         choiceValues = c("a", "b", "c")),
-
+      HTML("</div>"),
+      
+      # Interactive map jenks breaks options
+      HTML("<div id='contents'>"),
       selectInput("karttacol",
-                  "Select Jenks breaks parameter for the interactive map",
+                  HTML("Select Jenks breaks parameter for the interactive map <p style='font-size: 9px'>",
+                       "(9 Interactive map)</p>"),
                   c("jenks_answer_count", "jenks_parktime", 
                     "jenks_walktime", "jenks_ua_forest")),
       
+      sliderInput("jenks_n",
+                  "Select amount of Jenks classes", 
+                  min = 2, max = 8, value = 5),
+      HTML("</div>"),
+      
+      # Overriding all options (except interactive map), select inactive subdivs
+      HTML("<div id='contents'>"),
       checkboxGroupInput(
         "subdivGroup",
         HTML("Select inactive subdivisions <p style='font-size: 9px'>",
-          "(NB! selections here override Explanatory (ordinal) variable subdiv!)</p>"),
-        choiceNames = sort(as.character(unique(suuralue_f$Name))),
-        choiceValues = sort(as.character(unique(suuralue_f$Name)))),
-
+             "(NB! selections here override Explanatory (ordinal) variable subdiv!)</p>"),
+        choiceNames = sort(as.character(unique(thesisdata$subdiv))),
+        choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
+      
+      actionButton("resetSubdivs", "Clear inactive subdivisions"),
+      HTML("</div>"),
+      
       width = 3
     ),
-  
+    
     mainPanel(
       HTML("<div id='descrilink'</div>"),
-      h3("Descriptive statistics"),
-      p("If N is distributed somewhat equally, Levene test is not required."),
+      h3("1 Descriptive statistics"),
+      #p("If N is distributed somewhat equally, Levene test is not required."),
       tableOutput("descri"),
       hr(),
       
       HTML("<div id='histlink'</div>"),
-      h3("Histogram"),
+      h3("2 Histogram"),
+      p("For the response (continuous) variables"),
       plotOutput("hist"),
       hr(),
       
@@ -694,62 +750,57 @@ ui <- shinyUI(fluidPage(theme = shinytheme("slate"),
       conditionalPanel(
         condition = 
           "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-        h3("Distribution of ordinal variables"),
+        h3("3 Distribution of ordinal variables"),
         p("This plot appears when likert, parkspot or timeofday is selected as explanatory (ordinal) variable"),
         plotOutput("barplot"),
         hr()
       ),
       
       HTML("<div id='boxplotlink'</div>"),
-      h3("Boxplot"),
+      h3("4 Boxplot"),
       plotOutput("boxplot", height = "500px"),
       hr(),
       
       HTML("<div id='levenelink'</div>"),
-      h3("Test of Homogeneity of Variances"),
+      h3("5 Test of Homogeneity of Variances"),
       p("Levene value needs to be at least 0.05 for ANOVA test to be meaningful. If under 0.05, employ Brown-Forsythe test."),
       tableOutput("levene"),
       p("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1", 
-        style = "font-size:12px"),
+        style = "font-size:12px;margin-top:-12px"),
       hr(),
       
       HTML("<div id='anovalink'</div>"),
-      h3("Analysis of variance (ANOVA)"),
+      h3("6 Analysis of variance (ANOVA)"),
       tableOutput("anova"),
       p("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1", 
-        style = "font-size:12px"),
+        style = "font-size:12px;margin-top:-12px"),
       hr(),
       
       HTML("<div id='brownlink'</div>"),
-      h3("Brown-Forsythe"),
+      h3("7 Brown-Forsythe"),
       verbatimTextOutput("brownf"),
       hr(),
       
       HTML("<div id='maplink'</div>"),
-      h3("Active subdivisions"),
-      plotOutput("map"),
+      h3("8 Active subdivisions"),
+      ggiraphOutput("map"),
       hr(),
       
-      # This is an unfortunate hack to prevent the data providers from appearing
-      # on top of the context map
-      br(), br(), br(), br(), br(), br(), br(), br(), br(), br(), br(), br(),
-      br(), br(), br(), hr(),
-      
       HTML("<div id='intmaplink'</div>"),
-      h3("Survey results on research area map"),
+      h3("9 Survey results on research area map"),
       ggiraphOutput("interactive"),
+      hr(),
       
       h3("Data providers"),
       HTML("<a https://hri.fi/data/dataset/paakaupunkiseudun-aluejakokartat>",
-            "Municipality subdivisions</a>",
-            "(C) Helsingin, Espoon, Vantaan ja Kauniaisten mittausorganisaatiot",
-            "2011. Aineisto on muokkaamaton. License",
-            "<a https://creativecommons.org/licenses/by/4.0/deed.en> CC BY 4.0</a>",
-            "<br><a https://www.stat.fi/tup/paavo/index_en.html>",
-            "Postal code area boundaries</a> (C) Statistics Finland 2019.", 
-            "Retrieved 27.6.2019. License <a https://creativecommons.org/licenses/by/4.0/deed.en>",
-            "CC BY 4.0</a>"),
-      br()
+           "Municipality subdivisions</a>",
+           "(C) Helsingin, Espoon, Vantaan ja Kauniaisten mittausorganisaatiot",
+           "2011. Aineisto on muokkaamaton. License",
+           "<a https://creativecommons.org/licenses/by/4.0/deed.en> CC BY 4.0</a>",
+           "<br><a https://www.stat.fi/tup/paavo/index_en.html>",
+           "Postal code area boundaries</a> (C) Statistics Finland 2019.", 
+           "Retrieved 27.6.2019. License <a https://creativecommons.org/licenses/by/4.0/deed.en>",
+           "CC BY 4.0</a>")
     )
   )
 ))
