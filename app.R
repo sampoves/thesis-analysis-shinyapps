@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 16.3.2020
+# 2.4.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -203,12 +203,21 @@ centroids2[16, "label"] <- ""
 postal <- read.csv(file = postal_path, 
                    colClasses = c(posti_alue = "factor", kunta = "factor"),
                    header = TRUE, encoding = "UTF-8", sep = ",")
-postal <- postal[, c(2, 3, 108:119)]
+postal <- postal[, c(2, 3, 108:121)]
+
+# postal ua_forest * 100 for easier to view plotting
+postal[, "ua_forest"] <- postal[, "ua_forest"] * 100
+
+# create column which reports the largest ykr zone in each postal code area
+largest_ykr <- colnames(postal[, 4:10])[apply(postal[, 4:10], 1, which.max)]
+largest_ykr <- gsub("ykr_", "", largest_ykr)
+largest_ykr_no <- as.numeric(apply(postal[, 4:10], 1, max)) * 100
+postal <- cbind(postal, largest_ykr = paste(largest_ykr, largest_ykr_no))
 
 # postal geometries are in well-known text format. Some processing is needed to
 # utilise these polygons in R.
 crs <- sp::CRS("+init=epsg:3067")
-geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs)
+geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs) #rgeos::readWKT()
 sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
 row.names(postal) <- postal[, 1]
 data <- SpatialPolygonsDataFrame(
@@ -218,7 +227,7 @@ data <- SpatialPolygonsDataFrame(
 data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id", 
                 by.y = 0)
 
-# Get municipality borders
+# Get municipality borders from shapefile
 muns <- readOGR(munspath)
 muns <- spTransform(muns, crs)
 munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
@@ -232,15 +241,21 @@ munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
 
 server <- function(input, output, session){
   
-  #### Listener function ####
+  #### Listener functions ####
+  
+  # Listen to clear subdivs button. Resetting uses library shinyjs
+  observeEvent(input$resetSubdivs, {
+    reset("subdivGroup")
+  })
+  
   # Detect changes in selectInput to modify available check boxes
   observe({
     x <- input$expl
-
+    
     updateCheckboxGroupInput(session, "checkGroup", 
-      label = NULL, 
-      choiceNames = levels(thesisdata[, x]),
-      choiceValues = levels(thesisdata[, x]),)
+                             label = NULL, 
+                             choiceNames = levels(thesisdata[, x]),
+                             choiceValues = levels(thesisdata[, x]),)
     
     available <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
                    "subdiv")
@@ -328,13 +343,48 @@ server <- function(input, output, session){
     
     responsecol <- input$resp
     explanatorycol <- input$expl
+    binwidth <- input$bin
     
     inputdata <- thesisdata[!thesisdata[[explanatorycol]] %in% c(input$checkGroup), ]
     inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
-    hist(inputdata[[responsecol]],
-         main = paste("Histogram for", responsecol),
-         xlab = responsecol)
+    p <- ggplot(inputdata, aes(x = !!sym(responsecol))) + 
+      geom_histogram(color = "black", fill = "grey", binwidth = binwidth) +
+      
+      # Vertical lines for mean and median, respectively
+      geom_vline(aes(xintercept = mean(!!sym(responsecol)),
+                     color = "mean"),
+                 linetype = "longdash", 
+                 size = 1) +
+      geom_vline(aes(xintercept = median(!!sym(responsecol)),
+                     color = "median"),
+                 linetype = "longdash", 
+                 size = 1) +
+      
+      # This is kernel density estimate, a smoothed version of the histogram.
+      # Usually geom_density() sets the scale for y axis, but here we will
+      # continue using count/frequency. This requires some work on our behalf.
+      # Idea from here: https://stackoverflow.com/a/27612438/9455395
+      #geom_density(aes(y = binwidth * ..count..)) +
+      geom_density(aes(y = ..density.. * (nrow(inputdata) * binwidth)), 
+                   colour = alpha("black", 0.4),
+                   adjust = binwidth) +
+      
+      theme(legend.title = element_text(size = 15),
+            legend.text = element_text(size = 14),
+            axis.text = element_text(size = 12),
+            axis.title = element_text(size = 14)) +
+      
+      # build legend
+      scale_color_manual(name = paste("Vertical lines\nfor", responsecol), 
+                         values = c(median = "blue", mean = "red")) +
+      
+      # Conditional histogram bar labeling. No label for zero
+      stat_bin(binwidth = binwidth, 
+               geom = "text", 
+               aes(label = ifelse(..count.. > 0, ..count.., "")), 
+               vjust = -0.65)
+    p
   })
   
   
@@ -508,16 +558,24 @@ server <- function(input, output, session){
       # Legend contents
       scale_fill_identity(paste0("Currently active\nsubdivisions\n(", 
                                  active_subdivs, " out of 23)"), 
-                          labels = suuralue_f$Name, breaks = suuralue_f$color, 
+                          labels = suuralue_f$Name, 
+                          breaks = suuralue_f$color, 
                           guide = "legend") +
       
       # Annotations. centroids2 is subdiv labels, centroids is municipality
       # labels.
-      with(centroids, 
-           annotate(geom = "text", x = long, y = lat, label = label, size = 5,
-                    fontface = 2)) +
+      with(centroids, annotate(geom = "text", 
+                               x = long, 
+                               y = lat, 
+                               label = label, 
+                               size = 5,
+                               fontface = 2)) +
       with(centroids2[!centroids2$label %in% gsub(".* ", "", c(input$subdivGroup)), ], 
-           annotate(geom = "text", x = long, y = lat, label = label, size = 4)) +
+           annotate(geom = "text", 
+                    x = long, 
+                    y = lat, 
+                    label = label, 
+                    size = 4)) +
       
       # Tight layout and legend properties
       theme(plot.margin = grid::unit(c(0, 0, 0, 0), "mm"),
@@ -525,9 +583,10 @@ server <- function(input, output, session){
             legend.text = element_text(size = 14),
             legend.position = "bottom")
     
-    ggiraph(code = print(g2), width_svg = 14, height_svg = 12, 
-            options = list(
-              opts_sizing(rescale = FALSE)))
+    ggiraph(code = print(g2), 
+            width_svg = 14, 
+            height_svg = 12, 
+            options = list(opts_sizing(rescale = FALSE)))
   })
   
   
@@ -538,20 +597,30 @@ server <- function(input, output, session){
     # breaks classes
     data_f <- CreateJenksColumn(data_f, postal, "ua_forest", "jenks_ua_forest", input$jenks_n)
     data_f <- CreateJenksColumn(data_f, postal, "answer_count", "jenks_answer_count", input$jenks_n)
-    data_f <- CreateJenksColumn(data_f, postal, "parktime_mean", "jenks_parktime", input$jenks_n)
-    data_f <- CreateJenksColumn(data_f, postal, "walktime_mean", "jenks_walktime", input$jenks_n)
+    data_f <- CreateJenksColumn(data_f, postal, "parktime_mean", "jenks_park_mean", input$jenks_n)
+    data_f <- CreateJenksColumn(data_f, postal, "walktime_mean", "jenks_walk_mean", input$jenks_n)
+    data_f <- CreateJenksColumn(data_f, postal, "parktime_median", "jenks_park_median", input$jenks_n)
+    data_f <- CreateJenksColumn(data_f, postal, "walktime_median", "jenks_walk_median", input$jenks_n)
     
     if(input$karttacol == "jenks_ua_forest") {
       brewerpal <- "YlGn"
       legendname <- "Forest amount (%)"
       
-    } else if (input$karttacol == "jenks_walktime") {
+    } else if (input$karttacol == "jenks_park_mean") {
       brewerpal <- "BuPu"
-      legendname <- "Walking time (min)"
+      legendname <- "Parking time,\nmean (min)"
       
-    } else if (input$karttacol == "jenks_parktime") {
+    } else if (input$karttacol == "jenks_walk_mean") {
       brewerpal <- "Oranges"
-      legendname <- "Parking time (min)"
+      legendname <- "Parking time,\nmean (min)"
+      
+    } else if (input$karttacol == "jenks_park_median") {
+      brewerpal <- "BuGn"
+      legendname <- "Parking time,\nmedian (min)"
+      
+    } else if (input$karttacol == "jenks_walk_median") {
+      brewerpal <- "OrRd"
+      legendname <- "Walking time,\nmedian (min)"
       
     } else {
       # answer_count
@@ -563,19 +632,30 @@ server <- function(input, output, session){
     labels <- gsub("(])|(\\()|(\\[)", "", levels(data_f[, input$karttacol]))
     labels <- gsub(",", " \U2012 ", labels)
     
+    tooltip_content <- paste0(
+      "<div>%s, %s<br/>",
+      "Answer count: <b>%s</b></div>",
+      "<div style='padding-top: 3px;'>Mean parktime: %s</br>",
+      "Median parktime: %s</div>",
+      "<div style='padding-top: 3px;'>Mean walktime: %s</br>",
+      "Median walktime: %s</div>",
+      "<div style='padding-top: 3px;'>Forest (%%): %s</br>",
+      "Largest YKR (%%): %s</div>")
+    
     g <- ggplot(data_f) +
       geom_polygon_interactive(
         color = "black",
-        size = 0.2,        
+        size = 0.2,
         
         # aes_string() is to facilitate interactive map tooltip creation
         aes_string("long", "lat",
                    group = "group", 
                    fill = input$karttacol,
-                   tooltip = substitute(sprintf(
-                     "%s, %s<br/>Answer count: %s</br>Mean parktime: %s<br/>Mean walktime: %s<br/>Forest (%%): %s",
-                     id, nimi, answer_count, parktime_mean, walktime_mean, 
-                     ua_forest)))) +
+                   tooltip = substitute(
+                     sprintf(tooltip_content,
+                             id, nimi, answer_count, parktime_mean, 
+                             parktime_median,  walktime_mean, walktime_median,
+                             ua_forest, largest_ykr)))) +
       
       # Jenks classes colouring and labels
       scale_fill_brewer(palette = brewerpal,
@@ -594,9 +674,10 @@ server <- function(input, output, session){
       theme(legend.title = element_text(size = 15),
             legend.text = element_text(size = 14))
     
-    ggiraph(code = print(g), width_svg = 14, height_svg = 12,
-            options = list(
-              opts_sizing(rescale = FALSE)))
+    ggiraph(code = print(g), 
+            width_svg = 14, 
+            height_svg = 12, 
+            options = list(opts_sizing(rescale = FALSE)))
   })
 }
 
@@ -683,6 +764,12 @@ ui <- shinyUI(fluidPage(
                   "Explanatory (ordinal)", 
                   names(thesisdata[ordinal])),
       
+      # Allow user to access histogram binwidth
+      sliderInput("bin",
+                  HTML("Select binwidth for the current response variable", 
+                       "<p style='font-size: 9px'>(2 Histogram)</p>"), 
+                  min = 1, max = 10, value = 2),
+      
       # Provide user possibility to see distribution of answers within the
       # ordinal variables.
       # The values of this conditionalPanel are changed with the observer
@@ -695,7 +782,7 @@ ui <- shinyUI(fluidPage(
           HTML("Y axis for Distribution of ordinal variables <p style='font-size: 9px'>",
                "(3 Distribution of ordinal variables)</p>"),
           names(thesisdata[c("zipcode", "likert", "walktime")]),
-        )),
+      )),
       
       # These are changed with the observer function
       checkboxGroupInput(
@@ -708,10 +795,10 @@ ui <- shinyUI(fluidPage(
       # Interactive map jenks breaks options
       HTML("<div id='contents'>"),
       selectInput("karttacol",
-                  HTML("Select Jenks breaks parameter for the interactive map <p style='font-size: 9px'>",
-                       "(9 Interactive map)</p>"),
-                  c("jenks_answer_count", "jenks_parktime", 
-                    "jenks_walktime", "jenks_ua_forest")),
+                  HTML("Select Jenks breaks parameter for the interactive map", 
+                       "<p style='font-size: 9px'>(9 Interactive map)</p>"),
+                  c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
+                    "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
       
       sliderInput("jenks_n",
                   "Select amount of Jenks classes", 
@@ -797,8 +884,19 @@ ui <- shinyUI(fluidPage(
            "(C) Helsingin, Espoon, Vantaan ja Kauniaisten mittausorganisaatiot",
            "2011. Aineisto on muokkaamaton. License",
            "<a https://creativecommons.org/licenses/by/4.0/deed.en> CC BY 4.0</a>",
+           
            "<br><a https://www.stat.fi/tup/paavo/index_en.html>",
            "Postal code area boundaries</a> (C) Statistics Finland 2019.", 
+           "Retrieved 27.6.2019. License <a https://creativecommons.org/licenses/by/4.0/deed.en>",
+           "CC BY 4.0</a>",
+           
+           "<br><a https://land.copernicus.eu/local/urban-atlas/urban-atlas-2012>",
+           "Urban Atlas 2012</a> (C) European Environment Agency 2016.", 
+           "Retrieved 27.6.2019. License <a https://land.copernicus.eu/local/urban-atlas/urban-atlas-2012?tab=metadata>",
+           "available at Copernicus.eu</a>",
+           
+           "<br><a http://metatieto.ymparisto.fi:8080/geoportal/catalog/search/resource/details.page?uuid={B374BBB2-1EDF-4CF6-B11B-04E0017E9A26}>",
+           "Yhdyskuntarakenteen vyohykkeet 2017</a> (C) Finnish Environment Institute 2019.", 
            "Retrieved 27.6.2019. License <a https://creativecommons.org/licenses/by/4.0/deed.en>",
            "CC BY 4.0</a>")
     )

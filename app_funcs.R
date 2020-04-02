@@ -29,8 +29,12 @@ CreateJenksColumn <- function(fortified, postal, datacol, newcolname, classes_n 
   
   classes <- classInt::classIntervals(postal[, datacol], n = classes_n, 
                                       style = "jenks")
+  
+  # classes$brk has to be wrapped with unique(), otherwise we can't get more
+  # than six classes for parktime_median or walktime_median
   result <- fortified %>%
-    mutate(!!newcolname := cut(!!rlang::sym(datacol), classes$brks, 
+    mutate(!!newcolname := cut(!!rlang::sym(datacol), 
+                               unique(classes$brks), 
                                include.lowest = T))
   
   # Reverse column values to enable rising values from bottom to top in ggplot.
@@ -66,9 +70,9 @@ SigTableToShiny <- function(sigTable, hasHeading) {
   # Take into account that the table may have an attribute heading. Ask if this 
   # is the case
   if (hasHeading == FALSE){
-    sigTablePosition = 2
+    sigTablePosition <- 2
   } else {
-    sigTablePosition = 3
+    sigTablePosition <- 3
   }
   
   # Get the location of the signif.star
