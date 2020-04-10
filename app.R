@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 2.4.2020
+# 10.4.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -30,7 +30,7 @@ library(mapproj)
 
 
 
-#### Preparation ####
+#### Preparation --------------------------------------------------------------- 
 
 # Important directories
 datapath <- "pythonshinyrecords.csv"
@@ -46,7 +46,7 @@ source("app_funcs.R")
 continuous <- c("parktime", "walktime") 
 ordinal <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
              "subdiv") 
-supportcols <- c("X", "id", "timestamp", "ip")
+supportcols <- c("id", "timestamp", "ip")
 
 # Read in csv data. Define column types
 thesisdata <- read.csv(file = datapath,
@@ -93,21 +93,20 @@ levels(thesisdata$ua_forest) <- list("Predominantly forest" = 1,
                                      "Some forest" = 4,
                                      "Scarce forest" = 5)
 
-# Remove column "index". Remove X, pinta_ala
-thesisdata <- subset(thesisdata, select = -c(index))
+# Remove column "X"
+thesisdata <- subset(thesisdata, select = -c(X))
 
 
 
-#### Prepare the context map for ShinyApp ####
+#### Context map for ShinyApp --------------------------------------------------
 
 # Prepare a context map for to visualise currently active areas in analysis
-# ShinyApp. Updating this map makes the app a bit more sluggish. Delete this
-# code if you get sufficiently annoyed with the sluggishness.
-suuralue <- readOGR(suuraluepath, use_iconv = TRUE, encoding = "UTF-8")
+# ShinyApp.
+suuralue <- rgdal::readOGR(suuraluepath, use_iconv = TRUE, encoding = "UTF-8")
 
 # This preserves suuralue dataframe data
-suuralue_f <- merge(fortify(suuralue), as.data.frame(suuralue), by.x = "id", 
-                    by.y = 0)
+suuralue_f <- merge(ggplot2::fortify(suuralue), as.data.frame(suuralue), 
+                    by.x = "id", by.y = 0)
 
 # Align area names with thesisdata$subdiv
 levels(suuralue_f$Name) <- c("Vantaa Aviapolis", "Helsinki Southern",
@@ -127,10 +126,12 @@ thesisdata$subdiv <- factor(thesisdata$subdiv, levels = sort(levels(thesisdata$s
 suuralue_f$Name <- factor(suuralue_f$Name, levels = sort(levels(suuralue_f$Name)))
 
 # Get municipality borders
-muns_clipped <- readOGR(munsclippedpath)
-muns_clipped <- spTransform(muns_clipped, 
-                            CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
-muns_clipped_f <- merge(fortify(muns_clipped), as.data.frame(muns_clipped), 
+muns_clipped <- 
+  rgdal::readOGR(munsclippedpath) %>%
+  sp::spTransform(., sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
+
+# Fortify SP DataFrame for ggplot
+muns_clipped_f <- merge(ggplot2::fortify(muns_clipped), as.data.frame(muns_clipped), 
                         by.x = "id", by.y = 0)
 
 # Annotate muns in ggplot:
@@ -198,28 +199,30 @@ centroids2[16, "label"] <- ""
 # Created with the help of:
 # https://bhaskarvk.github.io/user2017.geodataviz/notebooks/03-Interactive-Maps.nb.html
 
-# Get postal code area data calculated in Python. Contains some interesting
-# variables for visualisation
-postal <- read.csv(file = postal_path, 
-                   colClasses = c(posti_alue = "factor", kunta = "factor"),
-                   header = TRUE, encoding = "UTF-8", sep = ",")
-postal <- postal[, c(2, 3, 108:121)]
+# Get postal code area data calculated in Python. It contains some interesting
+# variables for visualisation. Select essential columns and multiply column 
+# "ua_forest" with 100 for easier to view plotting
+postal <- 
+  read.csv(file = postal_path,
+           colClasses = c(posti_alue = "factor", kunta = "factor"),
+           header = TRUE, 
+           sep = ",") %>%
+  dplyr::select(c(2, 3, 6, 108:121)) %>%
+  dplyr::mutate(ua_forest = ua_forest * 100)
 
-# postal ua_forest * 100 for easier to view plotting
-postal[, "ua_forest"] <- postal[, "ua_forest"] * 100
-
-# create column which reports the largest ykr zone in each postal code area
-largest_ykr <- colnames(postal[, 4:10])[apply(postal[, 4:10], 1, which.max)]
+# Create column which reports the largest ykr zone in each postal code area
+largest_ykr <- colnames(postal[, 5:11])[apply(postal[, 5:11], 1, which.max)]
 largest_ykr <- gsub("ykr_", "", largest_ykr)
-largest_ykr_no <- as.numeric(apply(postal[, 4:10], 1, max)) * 100
+largest_ykr_no <- as.numeric(apply(postal[, 5:11], 1, max)) * 100
 postal <- cbind(postal, largest_ykr = paste(largest_ykr, largest_ykr_no))
 
-# postal geometries are in well-known text format. Some processing is needed to
+# "postal" geometries are in well-known text format. Some processing is needed to
 # utilise these polygons in R.
 crs <- sp::CRS("+init=epsg:3067")
 geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs) #rgeos::readWKT()
 sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
 row.names(postal) <- postal[, 1]
+
 data <- SpatialPolygonsDataFrame(
   SpatialPolygons(unlist(lapply(sp_tmp_ID, function(x) x@polygons)), 
                   proj4string = crs), data = postal)
@@ -228,8 +231,10 @@ data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id",
                 by.y = 0)
 
 # Get municipality borders from shapefile
-muns <- readOGR(munspath)
-muns <- spTransform(muns, crs)
+muns <- 
+  rgdal::readOGR(munspath) %>%
+  sp::spTransform(., crs)
+
 munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
 
 
@@ -241,32 +246,82 @@ munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
 
 server <- function(input, output, session){
   
-  #### Listener functions ####
+  #### Listener functions ------------------------------------------------------
   
   # Listen to clear subdivs button. Resetting uses library shinyjs
   observeEvent(input$resetSubdivs, {
     reset("subdivGroup")
   })
   
-  # Detect changes in selectInput to modify available check boxes
   observe({
+    # Detect changes in selectInput to modify available check boxes
     x <- input$expl
     
-    updateCheckboxGroupInput(session, "checkGroup", 
-                             label = NULL, 
-                             choiceNames = levels(thesisdata[, x]),
-                             choiceValues = levels(thesisdata[, x]),)
+    updateCheckboxGroupInput(
+      session, 
+      "checkGroup", 
+      label = NULL, 
+      choiceNames = levels(thesisdata[, x]),
+      choiceValues = levels(thesisdata[, x]),)
     
+    # Determine availability of barplot
     available <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
                    "subdiv")
-    updateSelectInput(session, "barplot",
-                      label = NULL,
-                      choices = available[!available == x])
+    updateSelectInput(
+      session, 
+      "barplot",
+      label = NULL,
+      choices = available[!available == x])
+    
+    # Don't allow selection of all checkboxes in Jenks
+    if(length(input$kunta) == 3) {
+      threevalues <<- input$kunta
+    }
+    if(length(input$kunta) > 3) {
+      
+      updateCheckboxGroupInput(
+        session, 
+        "kunta", 
+        selected = threevalues)
+    }
+    
+    # A clumsy implementation to listen for too large jenks breaks.
+    inputpostal <- postal[!postal$kunta %in% c(input$kunta), ]
+    
+    if(input$karttacol == "jenks_ua_forest") {
+      datacol <- "ua_forest"
+    } else if (input$karttacol == "jenks_walk_median") {
+      datacol <- "walktime_median"
+    } else if (input$karttacol == "jenks_park_median") {
+      datacol <- "parktime_median"
+    } else if (input$karttacol == "jenks_answer_count") {
+      datacol <- "answer_count"
+    } else if (input$karttacol == "jenks_walk_mean") {
+      datacol <- "walktime_mean"
+    } else if (input$karttacol == "jenks_park_mean") {
+      datacol <- "parktime_mean"
+    }
+    
+    # Only test classIntervals() and change SliderInput value if statement holds.
+    # Suppress warnings in the test.
+    if(nrow(inputpostal) > 1) {
+      classes_test <- suppressWarnings(
+        classInt::classIntervals(inputpostal[, datacol], n = input$jenks_n, style = "jenks"))
+      
+      # object returned from classIntervals() has an attribute nobs which I
+      # use to detect cases where too large input$jenks_n is inputted to
+      # CreateJenksColumn() function
+      if(attributes(classes_test)$nobs < input$jenks_n) {
+        updateSliderInput(session,
+                          "jenks_n",
+                          value = attributes(classes_test)$nobs)
+      }
+    }
   })
   
   
-
-  #### Descriptive statistics ####
+  
+  #### Descriptive statistics --------------------------------------------------
   output$descri <- renderTable({
     
     # Vital variables
@@ -279,16 +334,17 @@ server <- function(input, output, session){
     inputdata <- thesisdata[!thesisdata[[colname]] %in% c(input$checkGroup), 
                             !names(thesisdata) %in% supportcols]
     inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
-
+    
     # Basic descriptive statistics
-    desc <- describe(thisFormula, inputdata)
+    desc <- onewaytests::describe(thisFormula, inputdata)
     
     ### Std. Error
     # Clumsily calculate mean, so that we can preserve column names in the next
-    # phase
-    stder <- aggregate(thisFormula, data = inputdata,
-                       FUN = function(x) c(mean = mean(x),
-                                           "Std.Error" = std.error(x)))
+    # phase. Adapt code from: https://stackoverflow.com/a/41029914/9455395
+    stder <- aggregate(
+      thisFormula, 
+      data = inputdata,
+      FUN = function(x) c(mean = mean(x), "Std.Error" = plotrix::std.error(x)))
     
     # Remove column mean 
     stder <- subset(stder[[2]], select = -mean)
@@ -297,8 +353,8 @@ server <- function(input, output, session){
     # Confidence intervals for mean
     confs <- aggregate(
       thisFormula, data = inputdata, 
-      FUN = function(x) c("CI for mean, Lower Bound" = mean(x) - 2 * std.error(x), 
-                          "CI for mean, Upper Bound" = mean(x) + 2 * std.error(x)))
+      FUN = function(x) c("CI for mean, Lower Bound" = mean(x) - 2 * plotrix::std.error(x), 
+                          "CI for mean, Upper Bound" = mean(x) + 2 * plotrix::std.error(x)))
     confs <- confs[[2]]
     desc <- cbind(desc, confs)
     
@@ -314,15 +370,15 @@ server <- function(input, output, session){
     vect[2] <- sapply(2, function(x) median(desc[, x]))
     vect[3] <- sapply(3, function(x) mean(desc[, x]))
     vect[4] <- sd(response)
-    vect[5] <- std.error(response)
-    vect[6] <- mean(response) - 2 * std.error(response)
-    vect[7] <- mean(response) + 2 * std.error(response)
+    vect[5] <- plotrix::std.error(response)
+    vect[6] <- mean(response) - 2 * plotrix::std.error(response)
+    vect[7] <- mean(response) + 2 * plotrix::std.error(response)
     vect[8] <- min(response)
     vect[9] <- max(response)
     vect[10] <- quantile(response)[2]
     vect[11] <- quantile(response)[4]
-    vect[12] <- skewness(response)
-    vect[13] <- kurtosis(response)
+    vect[12] <- moments::skewness(response)
+    vect[13] <- moments::kurtosis(response)
     vect[13] <- sapply(14, function(x) sum(is.na(desc[, x])))
     
     # Add all values vector to desc, then name the new row and round all values in
@@ -338,7 +394,7 @@ server <- function(input, output, session){
   rownames = TRUE)
   
   
-  #### Histogram for parktime or walktime ####
+  #### Histogram for parktime or walktime --------------------------------------
   output$hist <- renderPlot({
     
     responsecol <- input$resp
@@ -365,7 +421,6 @@ server <- function(input, output, session){
       # Usually geom_density() sets the scale for y axis, but here we will
       # continue using count/frequency. This requires some work on our behalf.
       # Idea from here: https://stackoverflow.com/a/27612438/9455395
-      #geom_density(aes(y = binwidth * ..count..)) +
       geom_density(aes(y = ..density.. * (nrow(inputdata) * binwidth)), 
                    colour = alpha("black", 0.4),
                    adjust = binwidth) +
@@ -388,7 +443,7 @@ server <- function(input, output, session){
   })
   
   
-  #### Boxplot ####
+  #### Boxplot -----------------------------------------------------------------
   output$boxplot <- renderPlot({
     
     thisFormula <- as.formula(paste(input$resp, '~', input$expl))
@@ -417,16 +472,16 @@ server <- function(input, output, session){
     }
     p
   })
-
   
-  #### Barplot ####
+  
+  #### Barplot -----------------------------------------------------------------
   output$barplot <- renderPlot({
     
     # See distribution of ordinal variables through a grouped bar plot
     explanatorycol <- input$expl
     barplotval <- input$barplot
     yax <- paste("sum of", barplotval)
-
+    
     # Listen to user choices
     inputdata <- thesisdata[!thesisdata[[explanatorycol]] %in% c(input$checkGroup), ]
     inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
@@ -465,7 +520,7 @@ server <- function(input, output, session){
   })
   
   
-  #### Levene test ####
+  #### Levene test -------------------------------------------------------------
   output$levene <- renderTable({
     
     colname <- input$expl
@@ -474,8 +529,8 @@ server <- function(input, output, session){
     inputdata <- thesisdata[!thesisdata[[colname]] %in% c(input$checkGroup), ]
     inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
-    levene <- leveneTest(thisFormula, inputdata, center = mean) #car
-
+    levene <- car::leveneTest(thisFormula, inputdata, center = mean)
+    
     res <- SigTableToShiny(levene, TRUE)
     res
   }, 
@@ -484,9 +539,9 @@ server <- function(input, output, session){
   hover = TRUE,
   bordered = TRUE,
   rownames = TRUE)
-
   
-  #### One-way ANOVA ####
+  
+  #### One-way ANOVA -----------------------------------------------------------
   output$anova <- renderTable({
     
     colname <- input$expl
@@ -509,7 +564,7 @@ server <- function(input, output, session){
   bordered = TRUE,
   rownames = TRUE)
   
-  ### Brown-Forsythe test ####
+  ### Brown-Forsythe test ------------------------------------------------------
   output$brownf <- renderPrint({
     
     colname <- input$expl
@@ -521,12 +576,13 @@ server <- function(input, output, session){
     
     # bf.test() works so that the information we want is only printed to
     # console. Capture that output and place it in a variable
-    captured <- capture.output(bf.test(thisFormula, data = inputdata), 
-                               file = NULL, append = TRUE)
+    captured <- capture.output(onewaytests::bf.test(thisFormula, data = inputdata), 
+                               file = NULL, 
+                               append = TRUE)
     cat(captured, sep = "\n")
   })
   
-  ### Context map ####
+  ### Context map --------------------------------------------------------------
   output$map <- renderggiraph({
     
     # Count active subdivs
@@ -589,47 +645,58 @@ server <- function(input, output, session){
             options = list(opts_sizing(rescale = FALSE)))
   })
   
-  
-  ### Interactive map ####
+  ### Interactive map ----------------------------------------------------------
   output$interactive <- renderggiraph({
     
-    # Create jenks breaks columns here so that user gets the control of Jenks
-    # breaks classes
-    data_f <- CreateJenksColumn(data_f, postal, "ua_forest", "jenks_ua_forest", input$jenks_n)
-    data_f <- CreateJenksColumn(data_f, postal, "answer_count", "jenks_answer_count", input$jenks_n)
-    data_f <- CreateJenksColumn(data_f, postal, "parktime_mean", "jenks_park_mean", input$jenks_n)
-    data_f <- CreateJenksColumn(data_f, postal, "walktime_mean", "jenks_walk_mean", input$jenks_n)
-    data_f <- CreateJenksColumn(data_f, postal, "parktime_median", "jenks_park_median", input$jenks_n)
-    data_f <- CreateJenksColumn(data_f, postal, "walktime_median", "jenks_walk_median", input$jenks_n)
+    # only select municipalities selected by user. Do the same for "postal",
+    # we fetch jenks breaks from there.
+    inputdata <- data_f[!data_f$kunta %in% c(input$kunta), ]
+    inputpostal <- postal[!postal$kunta %in% c(input$kunta), ]
     
+    # Set interactive map extent by what's active on inputdata
+    minlat <- plyr::round_any(min(inputdata$lat), 100, f = floor)
+    maxlat <- plyr::round_any(max(inputdata$lat), 1000, f = ceiling)
+    minlon <- plyr::round_any(min(inputdata$lon), 100, f = floor)
+    maxlon <- plyr::round_any(max(inputdata$lon), 1000, f = ceiling)
+    
+    # Set properties for interactive map for each input$karttacol value
     if(input$karttacol == "jenks_ua_forest") {
+      datacol <- "ua_forest"
       brewerpal <- "YlGn"
       legendname <- "Forest amount (%)"
       
     } else if (input$karttacol == "jenks_park_mean") {
+      datacol <- "parktime_mean"
       brewerpal <- "BuPu"
       legendname <- "Parking time,\nmean (min)"
       
     } else if (input$karttacol == "jenks_walk_mean") {
+      datacol <- "walktime_mean"
       brewerpal <- "Oranges"
       legendname <- "Parking time,\nmean (min)"
       
     } else if (input$karttacol == "jenks_park_median") {
+      datacol <- "parktime_median"
       brewerpal <- "BuGn"
       legendname <- "Parking time,\nmedian (min)"
       
     } else if (input$karttacol == "jenks_walk_median") {
+      datacol <- "walktime_median"
       brewerpal <- "OrRd"
       legendname <- "Walking time,\nmedian (min)"
       
-    } else {
-      # answer_count
+    } else if (input$karttacol == "jenks_answer_count") {
+      datacol <- "answer_count"
       brewerpal <- "Reds"
       legendname <- "Answer count"
     }
     
+    # Create jenks breaks columns here so that user gets the control of Jenks
+    # breaks classes
+    inputdata <- CreateJenksColumn(inputdata, inputpostal, datacol, input$karttacol, input$jenks_n)
+    
     # Format map labels. Remove [, ], (, and ). Also add list dash
-    labels <- gsub("(])|(\\()|(\\[)", "", levels(data_f[, input$karttacol]))
+    labels <- gsub("(])|(\\()|(\\[)", "", levels(inputdata[, input$karttacol]))
     labels <- gsub(",", " \U2012 ", labels)
     
     tooltip_content <- paste0(
@@ -642,7 +709,7 @@ server <- function(input, output, session){
       "<div style='padding-top: 3px;'>Forest (%%): %s</br>",
       "Largest YKR (%%): %s</div>")
     
-    g <- ggplot(data_f) +
+    g <- ggplot(inputdata) +
       geom_polygon_interactive(
         color = "black",
         size = 0.2,
@@ -651,11 +718,9 @@ server <- function(input, output, session){
         aes_string("long", "lat",
                    group = "group", 
                    fill = input$karttacol,
-                   tooltip = substitute(
-                     sprintf(tooltip_content,
-                             id, nimi, answer_count, parktime_mean, 
-                             parktime_median,  walktime_mean, walktime_median,
-                             ua_forest, largest_ykr)))) +
+                   tooltip = substitute(sprintf(tooltip_content,
+                                                id, nimi, answer_count, parktime_mean, parktime_median, 
+                                                walktime_mean, walktime_median, ua_forest, largest_ykr)))) +
       
       # Jenks classes colouring and labels
       scale_fill_brewer(palette = brewerpal,
@@ -670,7 +735,8 @@ server <- function(input, output, session){
                    color = alpha("black", 0.6), 
                    fill = "NA",
                    size = 0.4) +
-      coord_fixed(ylim = c(6664000, 6700000)) +
+      coord_fixed(xlim = c(minlon, maxlon),
+                  ylim = c(minlat, maxlat)) +
       theme(legend.title = element_text(size = 15),
             legend.text = element_text(size = 14))
     
@@ -681,18 +747,19 @@ server <- function(input, output, session){
   })
 }
 
-
-
 ### ShinyApp UI elements ------------------------------------------------------- 
 ui <- shinyUI(fluidPage(
   useShinyjs(),
   theme = shinytheme("slate"),
   
   ### ShinyApp UI CSS ---------------------------------------------------------- 
-  # Edit various CSS features of the ShinyApp such as the Brown-Forsythe test 
-  # box and sidebarPanel (form.well) width. sidebarPanel width setting is 
-  # important because the long explanations would break it otherwise. Also
-  # manually set sidebarPanel z-index to make the element always appear on top.
+  
+  # Edit various CSS features of the ShinyApp: 
+  # - the Brown-Forsythe test box 
+  # - sidebarPanel (form.well) width. sidebarPanel width setting is important 
+  #   because the long explanations would break it otherwise. 
+  # - manually set sidebarPanel z-index to make the element always appear on top
+  # - .checkbox input achieves strikeout on selected checkboxes
   tags$head(
     tags$style(HTML("
       html, body {
@@ -732,13 +799,19 @@ ui <- shinyUI(fluidPage(
         max-width: 80vh;
         width: 250px;
         z-index: 50;
+        scroll-behavior: smooth;
       }
       .girafe_container_std {
         text-align: left;
+      }
+      .checkbox input[type=checkbox]:checked + span{
+        text-decoration: line-through;
+        color: dimgray;
       }"
     ))
-  ),                    
+  ),
   
+  ### Sidebar layout -----------------------------------------------------------
   titlePanel("Sampo Vesanen MSc thesis research survey results ShinyApp"),
   sidebarLayout(
     sidebarPanel(
@@ -754,35 +827,19 @@ ui <- shinyUI(fluidPage(
       HTML("<a href='#intmaplink'>9 Interactive map</a>"),
       HTML("</div>"),
       
-      # walktime or parktime
+      # Select walktime or parktime
       HTML("<div id='contents'>"),
-      selectInput("resp", 
-                  "Response (continuous)",
-                  names(thesisdata[continuous])),
+      selectInput(
+        "resp", 
+        HTML("<p style='font-size: 9px'>(These selections affect sections", 
+             "1&mdash;8)</p>Response (continuous)"),
+        names(thesisdata[continuous])),
+      
       # All others
-      selectInput("expl",
-                  "Explanatory (ordinal)", 
-                  names(thesisdata[ordinal])),
-      
-      # Allow user to access histogram binwidth
-      sliderInput("bin",
-                  HTML("Select binwidth for the current response variable", 
-                       "<p style='font-size: 9px'>(2 Histogram)</p>"), 
-                  min = 1, max = 10, value = 2),
-      
-      # Provide user possibility to see distribution of answers within the
-      # ordinal variables.
-      # The values of this conditionalPanel are changed with the observer
-      # function
-      conditionalPanel(
-        condition = 
-          "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-        selectInput(
-          "barplot", 
-          HTML("Y axis for Distribution of ordinal variables <p style='font-size: 9px'>",
-               "(3 Distribution of ordinal variables)</p>"),
-          names(thesisdata[c("zipcode", "likert", "walktime")]),
-      )),
+      selectInput(
+        "expl",
+        "Explanatory (ordinal)", 
+        names(thesisdata[ordinal])),
       
       # These are changed with the observer function
       checkboxGroupInput(
@@ -792,34 +849,81 @@ ui <- shinyUI(fluidPage(
         choiceValues = c("a", "b", "c")),
       HTML("</div>"),
       
-      # Interactive map jenks breaks options
+      # Allow user to access histogram binwidth
       HTML("<div id='contents'>"),
-      selectInput("karttacol",
-                  HTML("Select Jenks breaks parameter for the interactive map", 
-                       "<p style='font-size: 9px'>(9 Interactive map)</p>"),
-                  c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
-                    "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
-      
-      sliderInput("jenks_n",
-                  "Select amount of Jenks classes", 
-                  min = 2, max = 8, value = 5),
+      sliderInput(
+        "bin",
+        HTML("Select binwidth for the current response variable",
+             "<p style='font-size: 9px'>(2 Histogram)</p>"), 
+        min = 1, 
+        max = 10, 
+        value = 2),
       HTML("</div>"),
       
-      # Overriding all options (except interactive map), select inactive subdivs
+      # Provide user possibility to see distribution of answers within the
+      # ordinal variables.
+      # The values of this conditionalPanel are changed with the observer
+      # function
+      conditionalPanel(
+        condition = 
+          "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
+        
+        HTML("<div id='contents'>"),
+        selectInput(
+          "barplot", 
+          HTML("Y axis for Distribution of ordinal variables <p style='font-size: 9px'>",
+               "(3 Distribution of ordinal variables)</p>"),
+          names(thesisdata[c("zipcode", "likert", "walktime")]),
+        ),
+        HTML("</div>")),
+      
+      # Select to inactivate subdivs. Overrides all options (except interactive 
+      # map) 
       HTML("<div id='contents'>"),
       checkboxGroupInput(
         "subdivGroup",
         HTML("Select inactive subdivisions <p style='font-size: 9px'>",
-             "(NB! selections here override Explanatory (ordinal) variable subdiv!)</p>"),
+             "(Affects sections 1&mdash;8. Please be aware that these selections", 
+             "override Explanatory (ordinal) variable 'subdiv')</p>"),
         choiceNames = sort(as.character(unique(thesisdata$subdiv))),
         choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
       
-      actionButton("resetSubdivs", "Clear inactive subdivisions"),
+      # Reset inactivations with this button
+      actionButton(
+        "resetSubdivs", 
+        "Clear inactive subdivisions"),
+      HTML("</div>"),
+      
+      # Interactive map jenks breaks options
+      HTML("<p style='visibility: hidden' id='intmap-settings-link'></p>"),
+      HTML("<div id='contents'>"),
+      checkboxGroupInput(
+        "kunta",
+        HTML("Select extent for the interactive map", 
+             "<p style='font-size: 9px'>(9 Interactive map)</p>"),
+        choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
+        choiceValues = c("091", "092", "049", "235")),
+      
+      selectInput(
+        "karttacol",
+        HTML("Select Jenks breaks parameter for the interactive map",
+             "<p style='font-size: 9px'>(9 Interactive map)</p>"),
+        c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
+          "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
+      
+      sliderInput(
+        "jenks_n",
+        "Select amount of Jenks classes",
+        min = 2, 
+        max = 8, 
+        value = 5),
+      
       HTML("</div>"),
       
       width = 3
     ),
     
+    ### mainPanel layout -------------------------------------------------------
     mainPanel(
       HTML("<div id='descrilink'</div>"),
       h3("1 Descriptive statistics"),
@@ -875,6 +979,7 @@ ui <- shinyUI(fluidPage(
       
       HTML("<div id='intmaplink'</div>"),
       h3("9 Survey results on research area map"),
+      HTML("<a style='font-size: 12px' href='#intmap-settings-link'>View the settings for this map</a>"),
       ggiraphOutput("interactive"),
       hr(),
       
