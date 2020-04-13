@@ -21,7 +21,6 @@ library(dplyr)
 library(rgdal)
 library(RColorBrewer)
 library(shinyjs)
-library(colormap)
 library(ggiraph)
 library(widgetframe)
 library(rgeos)
@@ -30,11 +29,11 @@ library(mapproj)
 
 
 
-#### Preparation --------------------------------------------------------------- 
-
-# Important directories
+# Python prepared data directories
 datapath <- "pythonshinyrecords.csv"
 postal_path <- "pythonshinypostal.csv"
+
+# Spatial data paths
 suuraluepath <- "PKS_suuralue.kml"
 munsclippedpath <- "hcr_muns_clipped.shp"
 munspath <- "hcr_muns.shp"
@@ -42,60 +41,65 @@ munspath <- "hcr_muns.shp"
 # Source functions and postal code variables
 source("app_funcs.R")
 
+
+
+#### Preparation --------------------------------------------------------------- 
+
 # These variables are used to subset dataframe thesisdata inside ShinyApp
 continuous <- c("parktime", "walktime") 
 ordinal <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
              "subdiv") 
 supportcols <- c("id", "timestamp", "ip")
 
-# Read in csv data. Define column types
+# Read in csv data. Define column types. Name factor levels. Determine order of 
+# factor levels for plotting. Lastly, remove column "X"
 thesisdata <- read.csv(file = datapath,
                 colClasses = c(timestamp = "POSIXct", zipcode = "character", 
                                ip = "character", timeofday = "factor", 
                                parkspot = "factor", likert = "factor", 
                                ua_forest = "factor", ykr_zone = "factor", 
                                subdiv = "factor"),
-                header = TRUE, encoding = "UTF-8", sep = ",")
-
-# thesisdata$ykr_zone <- iconv(thesisdata$ykr_zone, to = "ASCII//TRANSLIT")
-# thesisdata$ykr_zone <- as.factor(thesisdata$ykr_zone)
-
-# Name factor levels. Determine order of factor levels for plotting
-levels(thesisdata$parkspot) <- list("On the side of street" = 1,
-                                    "Parking lot" = 2,
-                                    "Parking garage" = 3,
-                                    "Private or reserved" = 4,
-                                    "Other" = 5)
-
-levels(thesisdata$likert) <- list("Extremely familiar" = 1,
-                                  "Moderately familiar" = 2,
-                                  "Somewhat familiar" = 3,
-                                  "Slightly familiar" = 4,
-                                  "Not at all familiar" = 5)
-
-levels(thesisdata$timeofday) <- list("Weekday, rush hour" = 1,
-                                     "Weekday, other than rush hour" = 2,
-                                     "Weekend" = 3,
-                                     "Can't specify, no usual time" = 4)
-
-# SYKE does not provide official translations for these zones
-levels(thesisdata$ykr_zone) <- list("keskustan jalankulkuvyohyke" = 1,
-                                    "keskustan reunavyohyke" = 2,
-                                    "alakeskuksen jalankulkuvyohyke" = 3,
-                                    "intensiivinen joukkoliikennevyohyke" = 4,
-                                    "joukkoliikennevyohyke" = 5,
-                                    "autovyohyke" = 6,
-                                    "novalue" = 7)
-
-levels(thesisdata$ua_forest) <- list("Predominantly forest" = 1,
-                                     "Mostly forest" = 2,
-                                     "Moderate forest" = 3,
-                                     "Some forest" = 4,
-                                     "Scarce forest" = 5)
-
-# Remove column "X"
-thesisdata <- subset(thesisdata, select = -c(X))
-
+                header = TRUE, 
+                encoding = "UTF-8", 
+                sep = ",") %>%
+  
+  dplyr::mutate(parkspot = dplyr::recode(parkspot, 
+                                         `1` = "On the side of street",
+                                         `2` = "Parking lot",
+                                         `3` = "Parking garage",
+                                         `4` = "Private or reserved",
+                                         `5` = "Other"),
+                
+                likert = dplyr::recode(likert, 
+                                       `1` = "Extremely familiar",
+                                       `2` = "Moderately familiar",
+                                       `3` = "Somewhat familiar",
+                                       `4` = "Slightly familiar",
+                                       `5` = "Not at all familiar"),
+                
+                timeofday = dplyr::recode(timeofday, 
+                                          `1` = "Weekday, rush hour",
+                                          `2` = "Weekday, other than rush hour",
+                                          `3` = "Weekend",
+                                          `4` = "Can't specify, no usual time"),
+                
+                # SYKE does not provide official translations for these zones
+                ykr_zone = dplyr::recode(ykr_zone, 
+                                         `1` = "keskustan jalankulkuvyohyke",
+                                         `2` = "keskustan reunavyohyke",
+                                         `3` = "alakeskuksen jalankulkuvyohyke",
+                                         `4` = "intensiivinen joukkoliikennevyohyke",
+                                         `5` = "joukkoliikennevyohyke",
+                                         `6` = "autovyohyke",
+                                         `7` = "novalue"),
+                
+                ua_forest = dplyr::recode(ua_forest, 
+                                          `1` = "Predominantly forest",
+                                          `2` = "Mostly forest",
+                                          `3` = "Moderate forest",
+                                          `4` = "Some forest",
+                                          `5` = "Scarce forest")) %>%
+  dplyr::select(-X)
 
 
 #### Context map for ShinyApp --------------------------------------------------
@@ -487,15 +491,16 @@ server <- function(input, output, session){
     inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
     # Plot maximum y tick value. Use dplyr to group the desired max amount.
-    # In dplyr, use !!as.symbol(var) to notify that we are using variables
-    # to denote column names
+    # In dplyr, use !!as.symbol(var) to signify that we are using variables
+    # as column names
     maximum <- inputdata %>% 
-      group_by(!!as.symbol(explanatorycol), !!as.symbol(barplotval)) %>% 
-      summarise(amount = length(!!as.symbol(barplotval))) %>% 
-      top_n(n = 1)
-    maximum <- max(as.data.frame(maximum$amount))
+      dplyr::group_by(!!as.symbol(explanatorycol), !!as.symbol(barplotval)) %>% 
+      dplyr::summarise(amount = length(!!as.symbol(barplotval))) %>% 
+      dplyr::top_n(n = 1) %>%
+      dplyr::pull(amount) %>%
+      max()
     
-    if (maximum <= 200){
+    if (maximum <= 200) {
       tick_interval <- 50
     } else {
       tick_interval <- 200
@@ -640,8 +645,8 @@ server <- function(input, output, session){
             legend.position = "bottom")
     
     ggiraph(code = print(g2), 
-            width_svg = 14, 
-            height_svg = 12, 
+            width_svg = 16, 
+            height_svg = 14, 
             options = list(opts_sizing(rescale = FALSE)))
   })
   
@@ -741,8 +746,8 @@ server <- function(input, output, session){
             legend.text = element_text(size = 14))
     
     ggiraph(code = print(g), 
-            width_svg = 14, 
-            height_svg = 12, 
+            width_svg = 16, 
+            height_svg = 14, 
             options = list(opts_sizing(rescale = FALSE)))
   })
 }
@@ -778,7 +783,7 @@ ui <- shinyUI(fluidPage(
         max-width: 1200px;
       }
       #boxplot, #barplot, #hist {
-        max-width: 1000px;
+        max-width: 1200px;
       }
       #resetSubdivs {
         width: 100%;
@@ -984,26 +989,25 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       h3("Data providers"),
-      HTML("<a https://hri.fi/data/dataset/paakaupunkiseudun-aluejakokartat>",
+      HTML("<a href='https://hri.fi/data/dataset/paakaupunkiseudun-aluejakokartat'>",
            "Municipality subdivisions</a>",
            "(C) Helsingin, Espoon, Vantaan ja Kauniaisten mittausorganisaatiot",
-           "2011. Aineisto on muokkaamaton. License",
-           "<a https://creativecommons.org/licenses/by/4.0/deed.en> CC BY 4.0</a>",
+           "2011. Aineisto on muokkaamaton. License <a href='https://creativecommons.org/licenses/by/4.0/deed.en'> CC BY 4.0</a>.",
            
-           "<br><a https://www.stat.fi/tup/paavo/index_en.html>",
+           "<br><a href='https://www.stat.fi/tup/paavo/index_en.html'>",
            "Postal code area boundaries</a> (C) Statistics Finland 2019.", 
-           "Retrieved 27.6.2019. License <a https://creativecommons.org/licenses/by/4.0/deed.en>",
-           "CC BY 4.0</a>",
+           "Retrieved 27.6.2019. License <a href='https://creativecommons.org/licenses/by/4.0/deed.en'>",
+           "CC BY 4.0</a>.",
            
-           "<br><a https://land.copernicus.eu/local/urban-atlas/urban-atlas-2012>",
+           "<br><a href='https://land.copernicus.eu/local/urban-atlas/urban-atlas-2012'>",
            "Urban Atlas 2012</a> (C) European Environment Agency 2016.", 
-           "Retrieved 27.6.2019. License <a https://land.copernicus.eu/local/urban-atlas/urban-atlas-2012?tab=metadata>",
-           "available at Copernicus.eu</a>",
+           "Retrieved 27.6.2019. License <a href='https://land.copernicus.eu/local/urban-atlas/urban-atlas-2012?tab=metadata'>",
+           "available at Copernicus.eu</a>.",
            
-           "<br><a http://metatieto.ymparisto.fi:8080/geoportal/catalog/search/resource/details.page?uuid={B374BBB2-1EDF-4CF6-B11B-04E0017E9A26}>",
+           "<br><a href='http://metatieto.ymparisto.fi:8080/geoportal/catalog/search/resource/details.page?uuid={B374BBB2-1EDF-4CF6-B11B-04E0017E9A26}'>",
            "Yhdyskuntarakenteen vyohykkeet 2017</a> (C) Finnish Environment Institute 2019.", 
-           "Retrieved 27.6.2019. License <a https://creativecommons.org/licenses/by/4.0/deed.en>",
-           "CC BY 4.0</a>")
+           "Retrieved 27.6.2019. License <a href='https://creativecommons.org/licenses/by/4.0/deed.en'>",
+           "CC BY 4.0</a>.")
     )
   )
 ))
