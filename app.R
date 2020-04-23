@@ -129,7 +129,9 @@ levels(suuralue_f$Name) <- c("Vantaa Aviapolis", "Helsinki Southern",
 thesisdata$subdiv <- factor(thesisdata$subdiv, levels = sort(levels(thesisdata$subdiv)))
 suuralue_f$Name <- factor(suuralue_f$Name, levels = sort(levels(suuralue_f$Name)))
 
-# Get municipality borders
+# Get municipality borders. Shapefile data is from Regional population density
+# 2012, Statistics Finland. 
+# http://urn.fi/urn:nbn:fi:csc-kata00001000000000000226
 muns_clipped <- 
   rgdal::readOGR(munsclippedpath) %>%
   sp::spTransform(., sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
@@ -993,6 +995,11 @@ ui <- shinyUI(fluidPage(
            "Municipality subdivisions</a>",
            "(C) Helsingin, Espoon, Vantaan ja Kauniaisten mittausorganisaatiot",
            "2011. Aineisto on muokkaamaton. License <a href='https://creativecommons.org/licenses/by/4.0/deed.en'> CC BY 4.0</a>.",
+           
+           "<br><a href='http://urn.fi/urn:nbn:fi:csc-kata00001000000000000226'>",
+           "Regional population density 2012</a> (C) Statistics Finland 2019.", 
+           "Retrieved 13.3.2020. License <a href='http://www.nic.funet.fi/index/geodata/tilastokeskus/Tilastokeskus_terms_of_use_2018.pdf'>",
+           "Other (Open)</a>.",
            
            "<br><a href='https://www.stat.fi/tup/paavo/index_en.html'>",
            "Postal code area boundaries</a> (C) Statistics Finland 2019.", 
