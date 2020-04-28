@@ -807,6 +807,7 @@ ui <- shinyUI(fluidPage(
   #   because the long explanations would break it otherwise. 
   # - manually set sidebarPanel z-index to make the element always appear on top
   # - .checkbox input achieves strikeout on selected checkboxes
+  # - transition property smoothens resizing of images (plot outputs)
   tags$head(
     tags$style(HTML("
       html, body {
@@ -846,16 +847,30 @@ ui <- shinyUI(fluidPage(
         margin-bottom: -2px;
         font-weight: bold;
       }
+      #smallstyle {
+        margin-top: -10px;
+        font-size: 9px;
+        display: inline-block;
+      }
       form.well {
         display: 100%;
         position: fixed;
-        overflow: visible;
+        overflow: auto;
         overflow-y: auto;
-        max-height: 90vh;
-        max-width: 80vh;
+        max-height: 95vh;
+        resize: horizontal;
+        min-width: 250px;
+        max-width: 400px;
         width: 250px;
         z-index: 50;
         scroll-behavior: smooth;
+      }
+      section, h1, li, img {
+        -moz-transition: width 1s ease-in-out, left 1.5s ease-in-out;
+        -webkit-transition: width 1s ease-in-out, left 1.5s ease-in-out;
+        -moz-transition: width 1s ease-in-out, left 1.5s ease-in-out;
+        -o-transition: width 1s ease-in-out, left 1.5s ease-in-out;
+        transition: width 1s ease-in-out, left 1.5s ease-in-out;
       }
       .girafe_container_std {
         text-align: left;
@@ -868,7 +883,7 @@ ui <- shinyUI(fluidPage(
   ),
   
   ### Sidebar layout -----------------------------------------------------------
-  titlePanel("Sampo Vesanen MSc thesis research survey results ShinyApp"),
+  titlePanel(NULL, windowTitle = "Sampo Vesanen MSc thesis research survey results"),
   sidebarLayout(
     sidebarPanel(
       # &nbsp; is a non-breaking space. Will not be cut off at any situation
@@ -890,7 +905,8 @@ ui <- shinyUI(fluidPage(
       HTML("<div id='contents'>"),
       sliderInput(
         "parktime_max",
-        HTML("Set maximum allowed value for parktime (min),
+        HTML("<p style='font-size: 9px'>(These selections affect sections", 
+             "1&mdash;7)</p>Set maximum allowed value for parktime (min)
              <p style='font-size: 9px'>default 59</p>"), 
         min = min(thesisdata$parktime),
         max = max(thesisdata$parktime),
@@ -899,7 +915,7 @@ ui <- shinyUI(fluidPage(
       
       sliderInput(
         "walktime_max",
-        HTML("Set maximum allowed value for walktime (min),
+        HTML("Set maximum allowed value for walktime (min)
              <p style='font-size: 9px'>default 59</p>"), 
         min = min(thesisdata$walktime),
         max = max(thesisdata$walktime),
@@ -912,7 +928,7 @@ ui <- shinyUI(fluidPage(
       selectInput(
         "resp", 
         HTML("<p style='font-size: 9px'>(These selections affect sections", 
-             "1&mdash;8)</p>Response (continuous)"),
+             "1&mdash;7)</p>Response (continuous)"),
         names(thesisdata[continuous])),
       
       # All others
@@ -934,7 +950,7 @@ ui <- shinyUI(fluidPage(
       sliderInput(
         "bin",
         HTML("Select binwidth for the current response variable",
-             "<p style='font-size: 9px'>(2 Histogram)</p>"), 
+             "<a style='font-size: 9px' href='#histlink'>(2 Histogram)</a>"), 
         min = 1, 
         max = 10, 
         value = 2),
@@ -951,8 +967,9 @@ ui <- shinyUI(fluidPage(
         HTML("<div id='contents'>"),
         selectInput(
           "barplot", 
-          HTML("Y axis for Distribution of ordinal variables <p style='font-size: 9px'>",
-               "(3 Distribution of ordinal variables)</p>"),
+          HTML("Y axis for Distribution of ordinal variables <a",
+               "style='font-size: 9px' href='#barplotlink'>",
+               "(3 Distribution of ordinal variables)</a>"),
           names(thesisdata[c("zipcode", "likert", "walktime")]),
         ),
         HTML("</div>")),
@@ -980,14 +997,13 @@ ui <- shinyUI(fluidPage(
       checkboxGroupInput(
         "kunta",
         HTML("Select extent for the interactive map", 
-             "<p style='font-size: 9px'>(9 Interactive map)</p>"),
+             "<a id='smallstyle' href='#intmaplink'>(9 Interactive map)</a>"),
         choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
         choiceValues = c("091", "092", "049", "235")),
       
       selectInput(
         "karttacol",
-        HTML("Select Jenks breaks parameter for the interactive map",
-             "<p style='font-size: 9px'>(9 Interactive map)</p>"),
+        HTML("Select Jenks breaks parameter for the interactive map"),
         c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
           "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
       
@@ -1007,9 +1023,16 @@ ui <- shinyUI(fluidPage(
     
     ### mainPanel layout -------------------------------------------------------
     mainPanel(
+      h2("Sampo Vesanen MSc thesis research survey results"),
+      HTML("<p style='max-width: 1200px;'>Welcome to the analysis application",
+           "for the survey results for the thesis 'Parking of private cars and",
+           "spatial accessibility in Helsinki Capital Region'. Please see the",
+           "thesis and GitHub repository for additional information and",
+           "instructions how to use this application.</p>"),
+      hr(),
+      
       HTML("<div id='descrilink'</div>"),
       h3("1 Descriptive statistics"),
-      #p("If N is distributed somewhat equally, Levene test is not required."),
       tableOutput("descri"),
       hr(),
       
