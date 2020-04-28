@@ -436,15 +436,29 @@ server <- function(input, output, session){
     p <- ggplot(inputdata, aes(x = !!sym(resp_col))) + 
       geom_histogram(color = "black", fill = "grey", binwidth = binwidth) +
       
-      # Vertical lines for mean and median, respectively
+      # Vertical lines for mean and median, respectively. Also display exact
+      # values with geom_text().
       geom_vline(aes(xintercept = mean(!!sym(resp_col)),
                      color = "mean"),
                  linetype = "longdash", 
                  size = 1) +
+      geom_text(aes(x = mean(!!sym(resp_col)), 
+                    label = round(mean(!!sym(resp_col)), 2), 
+                    y = 0,
+                    hjust = -0.3,
+                    vjust = 1.2), 
+                colour = "red") +
+      
       geom_vline(aes(xintercept = median(!!sym(resp_col)),
                      color = "median"),
                  linetype = "longdash", 
                  size = 1) +
+      geom_text(aes(x = median(!!sym(resp_col)), 
+                    label = median(!!sym(resp_col)), 
+                    y = 0,
+                    hjust = 2,
+                    vjust = 1.2), 
+                colour = "blue") +
       
       # This is kernel density estimate, a smoothed version of the histogram.
       # Usually geom_density() sets the scale for y axis, but here we will
