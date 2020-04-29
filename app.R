@@ -83,24 +83,22 @@ thesisdata <- read.csv(file = datapath,
                                           `3` = "Weekend",
                                           `4` = "Can't specify, no usual time"),
                 
+                ua_forest = forcats::fct_relevel(ua_forest, 
+                                                 c("Predominantly forest", 
+                                                   "Mostly forest", "Moderate forest",
+                                                   "Some forest", "Scarce forest")),
+                
                 # SYKE does not provide official translations for 
                 # "Yhdyskuntarakenteen vyohykkeet".
-                ykr_zone = dplyr::recode(ykr_zone, 
-                                         `1` = "keskustan jalankulkuvyohyke",
-                                         `2` = "keskustan reunavyohyke",
-                                         `3` = "alakeskuksen jalankulkuvyohyke",
-                                         `4` = "intensiivinen joukkoliikennevyohyke",
-                                         `5` = "joukkoliikennevyohyke",
-                                         `6` = "autovyohyke",
-                                         `7` = "novalue"),
-                
-                ua_forest = dplyr::recode(ua_forest, 
-                                          `1` = "Predominantly forest",
-                                          `2` = "Mostly forest",
-                                          `3` = "Moderate forest",
-                                          `4` = "Some forest",
-                                          `5` = "Scarce forest")) %>%
+                ykr_zone = forcats::fct_relevel(ykr_zone, 
+                                                c("keskustan jalankulkuvyohyke", 
+                                                  "keskustan reunavyohyke", 
+                                                  "alakeskuksen jalankulkuvyohyke", 
+                                                  "intensiivinen joukkoliikennevyohyke", 
+                                                  "joukkoliikennevyohyke",
+                                                  "autovyohyke", "novalue"))) %>%
   dplyr::select(-X)
+
 
 
 #### Context map for ShinyApp --------------------------------------------------
@@ -213,7 +211,7 @@ zips <- unique(thesisdata$zipcode)
 # "ua_forest" with 100 for easier to view plotting
 postal <- 
   read.csv(file = postal_path,
-           colClasses = c(posti_alue = "factor", kunta = "factor"),
+           colClasses = c(zipcode = "factor", kunta = "factor"),
            header = TRUE, 
            sep = ",") %>%
   dplyr::select(c(2, 3, 6, 108:121)) %>%
