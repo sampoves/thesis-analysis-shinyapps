@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 27.4.2020
+# 29.4.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -206,6 +206,8 @@ centroids2[16, "label"] <- ""
 # Created with the help of:
 # https://bhaskarvk.github.io/user2017.geodataviz/notebooks/03-Interactive-Maps.nb.html
 
+zips <- unique(thesisdata$zipcode)
+
 # Get postal code area data calculated in Python. It contains some interesting
 # variables for visualisation. Select essential columns and multiply column 
 # "ua_forest" with 100 for easier to view plotting
@@ -260,9 +262,19 @@ server <- function(input, output, session){
     reset("subdivGroup")
   })
   
+  observeEvent(input$resetParkWalk, {
+    reset("parktime_max")
+    reset("walktime_max")
+  })
   
-  # Detect user setting for maximum parktime and walktime ----------------------
   
+  #### Reactive data -----------------------------------------------------------
+  
+  # currentdata(), currentpostal() and current_data_f() are reactive objects
+  # made to keep track of changes the Shiny application. Most of the app uses
+  # only currentdata(), but the interactive map utilises all of them. 
+  
+  # Detect user setting for maximum parktime and walktime.
   # currentdata() is the currently active rows of the original thesisdata 
   # DataFrame. Use currentdata() in the rest of the application to not interfere
   # with the original dataset.
@@ -270,6 +282,72 @@ server <- function(input, output, session){
     thesisdata %>%
       dplyr::filter(parktime <= input$parktime_max,
                     walktime <= input$walktime_max))
+  
+  
+  # currentpostal() calculates, when needed, answer counts, means, and medians
+  # for the values currently active in currentdata(). This is needed to make
+  # the interactive map tooltip values responsive to changes. In this phase,
+  # we calculate all the required data, the mapping part is in current_data_f()
+  currentpostal <- reactive({
+    
+    currentdata <- currentdata()
+    
+    # this makes currentdata compliant with changes to checkGroup and subdivGroup
+    currentdata <- currentdata[!currentdata[[input$expl]] %in% c(input$checkGroup), ]
+    currentdata <- currentdata[!currentdata$subdiv %in% c(input$subdivGroup), ]
+    
+    # tidyr::complete() helps find missing zipcodes and give them n=0
+    result <- postal %>%
+      mutate(answer_count = currentdata %>% 
+               group_by(zipcode) %>% 
+               tally() %>% 
+               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+               pull(n),
+             parktime_mean = currentdata %>%
+               group_by(zipcode) %>%
+               summarise(mean(parktime)) %>%
+               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+               pull(),
+             parktime_median = currentdata %>%
+               group_by(zipcode) %>%
+               summarise(median(parktime)) %>%
+               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+               pull(),
+             walktime_mean = currentdata %>%
+               group_by(zipcode) %>%
+               summarise(mean(walktime)) %>%
+               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+               pull(),
+             walktime_median = currentdata %>%
+               group_by(zipcode) %>%
+               summarise(median(walktime)) %>%
+               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+               pull())
+    
+    result$parktime_mean <- sapply(result[, "parktime_mean"], round, 2)
+    result$walktime_mean <- sapply(result[, "walktime_mean"], round, 2)
+    result
+  })
+  
+  
+  # current_data_f() produces the currently needed interactive map out of the
+  # data contained in currentpostal(). This is a copy of the code above, seen
+  # in "Interactive map fro ShinyApp". Please See code comments in the original.
+  current_data_f <- reactive({
+    
+    postal <- currentpostal()
+    
+    geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs) #rgeos::readWKT()
+    sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
+    row.names(postal) <- postal[, 1]
+    
+    data <- sp::SpatialPolygonsDataFrame(
+      sp::SpatialPolygons(unlist(lapply(sp_tmp_ID, function(x) x@polygons)),
+                          proj4string = crs), data = postal)
+    data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id", by.y = 0)
+    data_f
+  })
+  
   
   observe({
     # Detect changes in selectInput to modify available check boxes ------------
@@ -284,6 +362,8 @@ server <- function(input, output, session){
     
     
     # Determine availability of barplot ----------------------------------------
+    
+    # aka availability of "Distribution of ordinal variables"
     available <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
                    "subdiv")
     updateSelectInput(
@@ -293,7 +373,7 @@ server <- function(input, output, session){
       choices = available[!available == x])
     
     
-    # Don't allow selection of all checkboxes in Jenks -------------------------
+    # Do not allow selection of all checkboxes in Jenks ------------------------
     if(length(input$kunta) == 3) {
       threevalues <<- input$kunta
     }
@@ -485,8 +565,6 @@ server <- function(input, output, session){
         override.aes = list(color = c("darkgrey", "red", "blue"),
                             linetype = c("solid", "longdash", "longdash")))) +
       
-      xlab(paste(resp_col, "(min)")) +
-      
       # Conditional histogram bar labeling. No label for zero
       stat_bin(binwidth = binwidth, 
                geom = "text", 
@@ -514,7 +592,7 @@ server <- function(input, output, session){
     p <- ggplot(inputdata, aes_string(x = expl_col, y = resp_col)) + 
       geom_boxplot() + 
       ylab(paste(resp_col, "(min)"))
-      
+    
     if(length(legendnames) > 5) {
       p <- p +
         theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
@@ -631,7 +709,7 @@ server <- function(input, output, session){
     thisFormula <- as.formula(paste(resp_col, "~", expl_col))
     
     inputdata <- currentdata()
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), 
+    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup),
                            !names(inputdata) %in% supportcols]
     inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
@@ -709,10 +787,14 @@ server <- function(input, output, session){
   ### Interactive map ----------------------------------------------------------
   output$interactive <- renderggiraph({
     
-    # only select municipalities selected by user. Do the same for "postal",
+    # Use reactive data_f and postal
+    # Only select municipalities selected by user. Do the same for "postal",
     # we fetch jenks breaks from there.
-    inputdata <- data_f[!data_f$kunta %in% c(input$kunta), ]
-    inputpostal <- postal[!postal$kunta %in% c(input$kunta), ]
+    inputdata <- current_data_f()
+    inputdata <- inputdata[!inputdata$kunta %in% c(input$kunta), ]
+    
+    inputpostal <- currentpostal()
+    inputpostal <- inputpostal[!inputpostal$kunta %in% c(input$kunta), ]
     
     # Set interactive map extent by what's active on inputdata
     minlat <- plyr::round_any(min(inputdata$lat), 100, f = floor)
@@ -787,7 +869,8 @@ server <- function(input, output, session){
       scale_fill_brewer(palette = brewerpal,
                         direction = -1,
                         name = legendname,
-                        labels = labels) +
+                        labels = labels,
+                        na.value = "#ebebeb") +
       
       # Municipality borders
       geom_polygon(data = munsf,
@@ -821,7 +904,6 @@ ui <- shinyUI(fluidPage(
   #   because the long explanations would break it otherwise. 
   # - manually set sidebarPanel z-index to make the element always appear on top
   # - .checkbox input achieves strikeout on selected checkboxes
-  # - transition property smoothens resizing of images (plot outputs)
   tags$head(
     tags$style(HTML("
       html, body {
@@ -842,9 +924,10 @@ ui <- shinyUI(fluidPage(
       #boxplot, #barplot, #hist {
         max-width: 1200px;
       }
-      #resetSubdivs {
+      #resetSubdivs, #resetParkWalk {
         width: 100%;
-        padding: 8px 0px 8px 0px;
+        padding: 6px 0px 8px 0px;
+        white-space: normal;
       }
       #contents {
         border: 5px solid #2e3338;
@@ -860,11 +943,6 @@ ui <- shinyUI(fluidPage(
       #linkheading_t {
         margin-bottom: -2px;
         font-weight: bold;
-      }
-      #smallstyle {
-        margin-top: -10px;
-        font-size: 9px;
-        display: inline-block;
       }
       form.well {
         display: 100%;
@@ -920,8 +998,7 @@ ui <- shinyUI(fluidPage(
       sliderInput(
         "parktime_max",
         HTML("<p style='font-size: 9px'>(These selections affect sections", 
-             "1&mdash;7)</p>Set maximum allowed value for parktime (min)
-             <p style='font-size: 9px'>default 59</p>"), 
+             "1&mdash;7, 9)</p>Set maximum allowed value for parktime (min)"),
         min = min(thesisdata$parktime),
         max = max(thesisdata$parktime),
         value = 59,
@@ -929,12 +1006,16 @@ ui <- shinyUI(fluidPage(
       
       sliderInput(
         "walktime_max",
-        HTML("Set maximum allowed value for walktime (min)
-             <p style='font-size: 9px'>default 59</p>"), 
+        HTML("Set maximum allowed value for walktime (min)"), 
         min = min(thesisdata$walktime),
         max = max(thesisdata$walktime),
         value = 59,
         step = 1),
+      
+      actionButton(
+        "resetParkWalk", 
+        HTML("Revert values to default (59&nbsp;min)")),
+      
       HTML("</div>"),
       
       # Select walktime or parktime
@@ -942,10 +1023,10 @@ ui <- shinyUI(fluidPage(
       selectInput(
         "resp", 
         HTML("<p style='font-size: 9px'>(These selections affect sections", 
-             "1&mdash;7)</p>Response (continuous)"),
+             "1&mdash;7, 9)</p>Response (continuous)"),
         names(thesisdata[continuous])),
       
-      # All others
+      # likert, parkspot, timeofday, ua_forest, ykr_zone, subdiv
       selectInput(
         "expl",
         "Explanatory (ordinal)", 
@@ -953,7 +1034,7 @@ ui <- shinyUI(fluidPage(
       
       # These are changed with the observer function
       checkboxGroupInput(
-        "checkGroup", 
+        "checkGroup",
         "Select inactive groups in current explanatory variable",
         choiceNames = c("Item A", "Item B", "Item C"),
         choiceValues = c("a", "b", "c")),
@@ -994,7 +1075,7 @@ ui <- shinyUI(fluidPage(
       checkboxGroupInput(
         "subdivGroup",
         HTML("Select inactive subdivisions <p style='font-size: 9px'>",
-             "(Affects sections 1&mdash;8. Please be aware that these selections", 
+             "(Affects sections 1&mdash;9. Please be aware that these selections", 
              "override Explanatory (ordinal) variable 'subdiv')</p>"),
         choiceNames = sort(as.character(unique(thesisdata$subdiv))),
         choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
@@ -1010,8 +1091,9 @@ ui <- shinyUI(fluidPage(
       HTML("<div id='contents'>"),
       checkboxGroupInput(
         "kunta",
-        HTML("Select extent for the interactive map", 
-             "<a id='smallstyle' href='#intmaplink'>(9 Interactive map)</a>"),
+        HTML("Select extent for the interactive map <a",
+             "style='font-size: 9px' href='#intmaplink'>",
+             "(9 Interactive map)</a>"),
         choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
         choiceValues = c("091", "092", "049", "235")),
       
@@ -1023,14 +1105,14 @@ ui <- shinyUI(fluidPage(
       
       sliderInput(
         "jenks_n",
-        "Select amount of Jenks classes",
+        "Select the amount of classes",
         min = 2, 
         max = 8, 
         value = 5),
       
       HTML("</div>"),
       HTML("<p style='font-size: 11px; color: grey; margin-top: -10px;'>",
-           "Analysis app version 28.4.2020</p>"),
+           "Analysis app version 29.4.2020</p>"),
       
       width = 3
     ),
@@ -1072,7 +1154,7 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       HTML("<div id='levenelink'</div>"),
-      h3("5 Test of Homogeneity of Variances"),
+      h3("5 Test of Homogeneity of Variances (Levene's test)"),
       p("Levene value needs to be at least 0.05 for ANOVA test to be meaningful. If under 0.05, employ Brown-Forsythe test."),
       tableOutput("levene"),
       p("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1", 
@@ -1101,7 +1183,8 @@ ui <- shinyUI(fluidPage(
       
       HTML("<div id='intmaplink'</div>"),
       h3("9 Survey results on research area map"),
-      HTML("<a style='font-size: 12px' href='#intmap-settings-link'>View the settings for this map</a>"),
+      HTML("<a style='font-size: 12px' href='#intmap-settings-link'>",
+           "View the settings for this map</a>"),
       ggiraphOutput("interactive"),
       hr(),
       

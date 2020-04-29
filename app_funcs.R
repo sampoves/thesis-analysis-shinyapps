@@ -5,7 +5,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 2.4.2020
+# 29.4.2020
 
 
 
@@ -27,8 +27,15 @@ CreateJenksColumn <- function(fortified, postal, datacol, newcolname, classes_n 
   # Adapted from:
   # https://medium.com/@traffordDataLab/lets-make-a-map-in-r-7bd1d9366098
   
-  classes <- classInt::classIntervals(postal[, datacol], n = classes_n, 
-                                      style = "jenks")
+  # Suppress n jenks warnings, problem probably handled
+  classes <- suppressWarnings(
+    classInt::classIntervals(postal[, datacol], n = classes_n, style = "jenks"))
+  
+  # When sample size is reduced drastically, median columns tended to receive
+  # class intervals starting in the negative. Not possible in data, so fix it.
+  if(classes$brks[1] < 0) {
+    classes$brks[1] <- 0
+  }
   
   # classes$brk has to be wrapped with unique(), otherwise we can't get more
   # than six classes for parktime_median or walktime_median
