@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 29.4.2020
+# 3.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -54,14 +54,15 @@ supportcols <- c("id", "timestamp", "ip")
 # Read in csv data. Define column types. Name factor levels. Determine order of 
 # factor levels for plotting. Lastly, remove column "X"
 thesisdata <- read.csv(file = datapath,
-                colClasses = c(timestamp = "POSIXct", zipcode = "character", 
-                               ip = "character", timeofday = "factor", 
-                               parkspot = "factor", likert = "factor", 
-                               ua_forest = "factor", ykr_zone = "factor", 
-                               subdiv = "factor"),
-                header = TRUE, 
-                encoding = "UTF-8", 
-                sep = ",") %>%
+                       header = TRUE, 
+                       sep = ",",
+                       colClasses = c(timestamp = "POSIXct", zipcode = "character", 
+                                      ip = "character", timeofday = "factor", 
+                                      parkspot = "factor", likert = "factor", 
+                                      ua_forest = "factor", ykr_zone = "factor", 
+                                      subdiv = "factor"),
+                       encoding = "UTF-8", 
+                       stringsAsFactors = TRUE) %>%
   
   dplyr::mutate(parkspot = dplyr::recode(parkspot, 
                                          `1` = "On the side of street",
@@ -211,9 +212,10 @@ zips <- unique(thesisdata$zipcode)
 # "ua_forest" with 100 for easier to view plotting
 postal <- 
   read.csv(file = postal_path,
+           header = TRUE,
+           sep = ",",
            colClasses = c(zipcode = "factor", kunta = "factor"),
-           header = TRUE, 
-           sep = ",") %>%
+           stringsAsFactors = TRUE) %>%
   dplyr::select(c(2, 3, 6, 108:121)) %>%
   dplyr::mutate(ua_forest = ua_forest * 100)
 
@@ -1110,7 +1112,7 @@ ui <- shinyUI(fluidPage(
       
       HTML("</div>"),
       HTML("<p style='font-size: 11px; color: grey; margin-top: -10px;'>",
-           "Analysis app version 29.4.2020</p>"),
+           "Analysis app version 3.5.2020</p>"),
       
       width = 3
     ),
