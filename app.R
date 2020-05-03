@@ -106,7 +106,10 @@ thesisdata <- read.csv(file = datapath,
 
 # Prepare a context map for to visualise currently active areas in analysis
 # ShinyApp.
-suuralue <- rgdal::readOGR(suuraluepath, use_iconv = TRUE, encoding = "UTF-8")
+suuralue <- rgdal::readOGR(suuraluepath, 
+                           use_iconv = TRUE, 
+                           encoding = "UTF-8", 
+                           stringsAsFactors = TRUE)
 
 # This preserves suuralue dataframe data
 suuralue_f <- merge(ggplot2::fortify(suuralue), as.data.frame(suuralue), 
@@ -133,7 +136,7 @@ suuralue_f$Name <- factor(suuralue_f$Name, levels = sort(levels(suuralue_f$Name)
 # 2012, Statistics Finland. 
 # http://urn.fi/urn:nbn:fi:csc-kata00001000000000000226
 muns_clipped <- 
-  rgdal::readOGR(munsclippedpath) %>%
+  rgdal::readOGR(munsclippedpath, stringsAsFactors = TRUE) %>%
   sp::spTransform(., sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
 
 # Fortify SP DataFrame for ggplot
@@ -241,7 +244,7 @@ data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id",
 
 # Get municipality borders from shapefile
 muns <- 
-  rgdal::readOGR(munspath) %>%
+  rgdal::readOGR(munspath, stringsAsFactors = TRUE) %>%
   sp::spTransform(., crs)
 
 munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
@@ -337,7 +340,7 @@ server <- function(input, output, session){
     
     postal <- currentpostal()
     
-    geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs) #rgeos::readWKT()
+    geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs)
     sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
     row.names(postal) <- postal[, 1]
     
