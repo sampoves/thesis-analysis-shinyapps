@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 4.5.2020
+# 6.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -26,6 +26,7 @@ library(widgetframe)
 library(rgeos)
 library(classInt)
 library(mapproj)
+library(shinyWidgets)
 
 
 
@@ -143,19 +144,13 @@ muns_clipped <-
 muns_clipped_f <- merge(ggplot2::fortify(muns_clipped), as.data.frame(muns_clipped), 
                         by.x = "id", by.y = 0)
 
-# Annotate muns in ggplot:
-# https://stackoverflow.com/a/28963405/9455395
-centroids <- setNames(
-  do.call("rbind.data.frame", by(muns_clipped_f, muns_clipped_f$nimi, function(x) 
-  {Polygon(x[c("long", "lat")])@labpt})), c("long", "lat"))
-
-centroids2 <- setNames(
-  do.call("rbind.data.frame", by(suuralue_f, suuralue_f$Name, function(x) 
-  {Polygon(x[c("long", "lat")])@labpt})), c("long", "lat"))
+# Annotate municipalities in ggplot
+muns_cntr <- GetCentroids(muns_clipped_f, "nimi", "nimi")
+subdiv_cntr <- GetCentroids(suuralue_f, "Name", "Name")
 
 # Manually set better location for the annotation of Helsinki
-centroids[2, 2] <- centroids[2, 2] + 0.02
-centroids$label <- c("Espoo", "Helsinki", "Kauniainen", "Vantaa")
+muns_cntr[2, 2] <- muns_cntr[2, 2] + 0.02
+muns_cntr$label <- c("Espoo", "Helsinki", "Kauniainen", "Vantaa")
 
 # Set color gradients for municipalities. Kauniainen will be a single color set 
 # below. These color gradients may be confusing. Investigate better colouring
@@ -188,19 +183,19 @@ suuralue_f$color <- c(rep(c_esp[1], amounts[1]), rep(c_esp[2], amounts[2]),
 suuralue_f <- suuralue_f %>% mutate(color = as.factor(color)) # to factor
 
 # name labels here so that all the reordering doesn't mix up stuff
-centroids2$label <- unique(suuralue_f$Name)
+subdiv_cntr$label <- unique(suuralue_f$Name)
 
 # name labels here so that all the reordering doesn't mix up stuff. Remove
 # munnames from subdiv annotations
-centroids2$label <- gsub(".* ", "", unique(suuralue_f$Name)) 
+subdiv_cntr$label <- gsub(".* ", "", unique(suuralue_f$Name)) 
 
 # Manually move Espoonlahti and Southeastern to be visible. Remove subdiv label
 # for Kauniainen
-centroids2[2, "lat"] <- centroids2[2, "lat"] + 0.05
-centroids2[2, "long"] <- centroids2[2, "long"] - 0.04
-centroids2[13, "lat"] <- centroids2[13, "lat"] + 0.08
-centroids2[13, "long"] <- centroids2[13, "long"] + 0.05
-centroids2[16, "label"] <- ""
+subdiv_cntr[2, "lat"] <- subdiv_cntr[2, "lat"] + 0.05
+subdiv_cntr[2, "long"] <- subdiv_cntr[2, "long"] - 0.04
+subdiv_cntr[13, "lat"] <- subdiv_cntr[13, "lat"] + 0.08
+subdiv_cntr[13, "long"] <- subdiv_cntr[13, "long"] + 0.05
+subdiv_cntr[16, "label"] <- ""
 
 
 
@@ -760,15 +755,15 @@ server <- function(input, output, session){
                           breaks = suuralue_f$color, 
                           guide = "legend") +
       
-      # Annotations. centroids2 is subdiv labels, centroids is municipality
+      # Annotations. subdiv_cntr is subdiv labels, muns_cntr is municipality
       # labels.
-      with(centroids, annotate(geom = "text", 
+      with(muns_cntr, annotate(geom = "text", 
                                x = long, 
                                y = lat, 
                                label = label, 
                                size = 5,
                                fontface = 2)) +
-      with(centroids2[!centroids2$label %in% gsub(".* ", "", c(input$subdivGroup)), ], 
+      with(subdiv_cntr[!subdiv_cntr$label %in% gsub(".* ", "", c(input$subdivGroup)), ], 
            annotate(geom = "text", 
                     x = long, 
                     y = lat, 
@@ -845,6 +840,17 @@ server <- function(input, output, session){
     inputdata <- CreateJenksColumn(inputdata, inputpostal, datacol, input$karttacol, 
                                    input$jenks_n)
     
+    # Get centroids for labelling polygons
+    current_centr <- GetCentroids(inputdata, "zipcode", datacol)
+    
+    # Finetune locations for certain labels
+    current_centr[15, 1] <- current_centr[15, 1] + 500 # Taka-Toolo
+    current_centr[83, 1] <- current_centr[83, 1] - 850 # Etela-Vuosaari
+    current_centr[107, 2] <- current_centr[107, 2] - 300 # Hamevaara 
+    current_centr[116, 2] <- current_centr[116, 2] - 500 # Vantaanpuisto
+    current_centr[144, 1] <- current_centr[144, 1] + 2400 # Suvisaaristo
+    current_centr[162, 1] <- current_centr[162, 1] + 1000 # Nupuri-Nuuksio
+    
     # Format map labels. Remove [, ], (, and ). Also add list dash
     labels <- gsub("(])|(\\()|(\\[)", "", levels(inputdata[, input$karttacol]))
     labels <- gsub(",", " \U2012 ", labels)
@@ -852,12 +858,13 @@ server <- function(input, output, session){
     tooltip_content <- paste0(
       "<div>%s, %s<br/>",
       "Answer count: <b>%s</b></div>",
-      "<div style='padding-top: 3px;'>Mean parktime: %s</br>",
-      "Median parktime: %s</div>",
-      "<div style='padding-top: 3px;'>Mean walktime: %s</br>",
-      "Median walktime: %s</div>",
-      "<div style='padding-top: 3px;'>Forest (%%): %s</br>",
-      "Largest YKR (%%): %s</div>")
+      "<hr style='margin-top:2px; margin-bottom:2px;'>",
+      "<div style='padding-top: 3px;'>Parktime, mean: %s</br>",
+      "Parktime, median: %s</div>",
+      "<div style='padding-top: 3px;'>Walktime, mean: %s</br>",
+      "Walktime, median: %s</div>",
+      "<div style='padding-top: 3px;'>Forest (%%): %s</div>",
+      "<div style='padding-top: 3px; line-height: 1.2;'>Largest YKR<br/>zone (%%): %s</div>")
     
     g <- ggplot(inputdata) +
       geom_polygon_interactive(
@@ -869,8 +876,8 @@ server <- function(input, output, session){
                    group = "group", 
                    fill = input$karttacol,
                    tooltip = substitute(sprintf(tooltip_content,
-                                                id, nimi, answer_count, parktime_mean, parktime_median, 
-                                                walktime_mean, walktime_median, ua_forest, largest_ykr)))) +
+                      id, nimi, answer_count, parktime_mean, parktime_median, 
+                      walktime_mean, walktime_median, ua_forest, largest_ykr)))) +
       
       # Jenks classes colouring and labels
       scale_fill_brewer(palette = brewerpal,
@@ -892,12 +899,23 @@ server <- function(input, output, session){
       # Class intervals disclaimer
       labs(caption = paste("The Jenks breaks classes are non-overlapping. The",
                            "lowest value of each range, with the exception of",
-                           "the most bottom one, are not included in that class.")) +
+                           "the most bottom one, is not included in that class.")) +
       
       # Legend settings
       theme(legend.title = element_text(size = 15),
             legend.text = element_text(size = 14),
             plot.caption = element_text(size = 13, hjust = 0.5))
+    
+    
+    # Label switch boolean test
+    if(input$show_int_labels == TRUE) {
+      g = g + with(current_centr,
+                   annotate(geom = "text",
+                            x = long, 
+                            y = lat, 
+                            label = label, 
+                            size = 4))
+    }
     
     ggiraph(code = print(g), 
             width_svg = 16, 
@@ -972,12 +990,23 @@ ui <- shinyUI(fluidPage(
         z-index: 50;
         scroll-behavior: smooth;
       }
+      text {
+        pointer-events: none;
+      }
       section, h1, li, img {
         -moz-transition: width 1s ease-in-out, left 1.5s ease-in-out;
         -webkit-transition: width 1s ease-in-out, left 1.5s ease-in-out;
         -moz-transition: width 1s ease-in-out, left 1.5s ease-in-out;
         -o-transition: width 1s ease-in-out, left 1.5s ease-in-out;
         transition: width 1s ease-in-out, left 1.5s ease-in-out;
+      }
+      .noselect {
+        -webkit-touch-callout: none; /* iOS Safari */
+        -webkit-user-select: none; /* Safari */
+        -khtml-user-select: none; /* Konqueror HTML */
+        -moz-user-select: none; /* Old versions of Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+        user-select: none; /* Non-prefixed version, currently supported by Chrome, Opera and Firefox */
       }
       .girafe_container_std {
         text-align: left;
@@ -1118,6 +1147,12 @@ ui <- shinyUI(fluidPage(
         c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
           "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
       
+      # Switch for interactive map labels
+      HTML("<label class='control-label' for='show_int_labels'>Show labels</label>"),
+      shinyWidgets::switchInput(
+        inputId = "show_int_labels", 
+        value = TRUE),
+      
       sliderInput(
         "jenks_n",
         "Select the amount of classes",
@@ -1127,10 +1162,11 @@ ui <- shinyUI(fluidPage(
       
       HTML("</div>"),
       HTML("<p style='font-size: 11px; color: grey; margin-top: -10px;'>",
-           "Analysis app version 4.5.2020</p>"),
+           "Analysis app version 6.5.2020</p>"),
       
       width = 3
     ),
+    
     
     ### mainPanel layout -------------------------------------------------------
     mainPanel(
