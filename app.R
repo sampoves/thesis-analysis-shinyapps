@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 6.5.2020
+# 7.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -434,12 +434,12 @@ server <- function(input, output, session){
     # And as a reminder, currentdata() is called to keep track of maximum
     # parktime and walktime values
     inputdata <- currentdata()
-    response <- inputdata[[resp_col]]
     
     # Take subdiv checkbox group into account
     inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), 
                            !names(inputdata) %in% supportcols]
     inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
+    response <- inputdata[[resp_col]]
     
     # Basic descriptive statistics
     desc <- onewaytests::describe(thisFormula, inputdata)
@@ -469,12 +469,12 @@ server <- function(input, output, session){
                    "CI for mean, Lower Bound", "CI for mean, Upper Bound", "Min", 
                    "Max", "25th", "75th", "Skewness", "Kurtosis", "NA")]
     
-    # Add a total row. We will add total values for all columns in this 
-    # inconvenient manner.
+    # Add the total row. We will add total values for all columns in this manner,
+    # using "response" which is all currently active parktime or walktime values.
     vect <- c()
-    vect[1] <- sapply(1, function(x) sum(desc[, x]))
-    vect[2] <- sapply(2, function(x) median(desc[, x]))
-    vect[3] <- sapply(3, function(x) mean(desc[, x]))
+    vect[1] <- length(response)
+    vect[2] <- median(response)
+    vect[3] <- mean(response)
     vect[4] <- sd(response)
     vect[5] <- plotrix::std.error(response)
     vect[6] <- mean(response) - 2 * plotrix::std.error(response)
@@ -485,7 +485,7 @@ server <- function(input, output, session){
     vect[11] <- quantile(response)[4]
     vect[12] <- moments::skewness(response)
     vect[13] <- moments::kurtosis(response)
-    vect[13] <- sapply(14, function(x) sum(is.na(desc[, x])))
+    vect[14] <- sum(is.na(response))
     
     # Add all values vector to desc, then name the new row and round all values in
     # desc.
@@ -924,10 +924,12 @@ server <- function(input, output, session){
   })
 }
 
+
 ### ShinyApp UI elements ------------------------------------------------------- 
 ui <- shinyUI(fluidPage(
   useShinyjs(),
   theme = shinytheme("slate"),
+  
   
   ### ShinyApp UI CSS ---------------------------------------------------------- 
   
@@ -937,6 +939,9 @@ ui <- shinyUI(fluidPage(
   #   because the long explanations would break it otherwise. 
   # - manually set sidebarPanel z-index to make the element always appear on top
   # - .checkbox input achieves strikeout on selected checkboxes
+  # - pointer-events: none; makes zipcode labels invisible to the cursor
+  # - noselect makes selecting ggiraph elements not possible
+  # - :last-child pseudo-selector makes last row of descriptive statistics bold
   tags$head(
     tags$style(HTML("
       html, body {
@@ -953,6 +958,9 @@ ui <- shinyUI(fluidPage(
         overflow-x: auto;
         max-height: 80vh;
         max-width: 1200px;
+      }
+      #descri tr:last-child { 
+        font-weight: bold;
       }
       #boxplot, #barplot, #hist {
         max-width: 1200px;
@@ -1017,6 +1025,7 @@ ui <- shinyUI(fluidPage(
       }"
     ))
   ),
+  
   
   ### Sidebar layout -----------------------------------------------------------
   titlePanel(NULL, windowTitle = "Sampo Vesanen MSc thesis research survey results"),
@@ -1162,7 +1171,7 @@ ui <- shinyUI(fluidPage(
       
       HTML("</div>"),
       HTML("<p style='font-size: 11px; color: grey; margin-top: -10px;'>",
-           "Analysis app version 6.5.2020</p>"),
+           "Analysis app version 7.5.2020</p>"),
       
       width = 3
     ),
@@ -1236,7 +1245,9 @@ ui <- shinyUI(fluidPage(
       h3("9 Survey results on research area map"),
       HTML("<a style='font-size: 12px' href='#intmap-settings-link'>",
            "View the settings for this map</a>"),
+      HTML("<div class='noselect'>"),
       ggiraphOutput("interactive"),
+      HTML("</div>"),
       hr(),
       
       h3("Data providers"),
