@@ -5,7 +5,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 6.5.2020
+# 8.5.2020
 
 
 
@@ -49,10 +49,10 @@ GetCentroids <- function(fortified, unique_id, nominator) {
             by(fortified,
                fortified[, unique_id],
                function(x) {c(sp::Polygon(x[c("long", "lat")])@labpt,
-                              x %>% 
-                                group_by(!!rlang::sym(nominator)) %>%
-                                summarise() %>%
-                                pull() %>%
+                              x %>%
+                                dplyr::group_by(!!rlang::sym(nominator)) %>%
+                                dplyr::summarise() %>%
+                                dplyr::pull() %>%
                                 as.vector())
                })) %>%
     setNames(., c("long", "lat", "label"))

@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 7.5.2020
+# 8.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -16,6 +16,7 @@ library(moments)
 library(shiny)
 library(shinythemes)
 library(ggplot2)
+library(Rmisc)
 library(tidyr)
 library(dplyr)
 library(rgdal)
@@ -52,6 +53,8 @@ continuous <- c("parktime", "walktime")
 ordinal <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
              "subdiv")
 supportcols <- c("id", "timestamp", "ip")
+int_cols <- c("n", "Min", "Max", "NA")
+
 
 # Read in csv data. Define column types. Name factor levels. Determine order of 
 # factor levels for plotting. Lastly, remove column "X"
@@ -181,7 +184,9 @@ suuralue_f$color <- c(rep(c_esp[1], amounts[1]), rep(c_esp[2], amounts[2]),
                       rep(c_van[7], amounts[23]))
 
 # Colors to factors and reorder subdivision names to facilitate ggplot
-suuralue_f <- suuralue_f %>% mutate(color = as.factor(color)) # to factor
+suuralue_f <- 
+  suuralue_f %>% 
+  dplyr::mutate(color = as.factor(color)) # to factor
 
 # name labels here so that all the reordering doesn't mix up stuff
 subdiv_cntr$label <- unique(suuralue_f$Name)
@@ -297,31 +302,35 @@ server <- function(input, output, session){
     
     # tidyr::complete() helps find missing zipcodes and give them n=0
     result <- postal %>%
-      mutate(answer_count = currentdata %>% 
-               group_by(zipcode) %>% 
-               tally() %>% 
-               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
-               pull(n),
-             parktime_mean = currentdata %>%
-               group_by(zipcode) %>%
-               summarise(mean(parktime)) %>%
-               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
-               pull(),
-             parktime_median = currentdata %>%
-               group_by(zipcode) %>%
-               summarise(median(parktime)) %>%
-               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
-               pull(),
-             walktime_mean = currentdata %>%
-               group_by(zipcode) %>%
-               summarise(mean(walktime)) %>%
-               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
-               pull(),
-             walktime_median = currentdata %>%
-               group_by(zipcode) %>%
-               summarise(median(walktime)) %>%
-               tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
-               pull())
+      dplyr::mutate(answer_count = currentdata %>% 
+                      dplyr::group_by(zipcode) %>% 
+                      dplyr::tally() %>% 
+                      tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+                      dplyr::pull(n),
+                    
+                    parktime_mean = currentdata %>%
+                      dplyr::group_by(zipcode) %>%
+                      dplyr::summarise(mean(parktime)) %>%
+                      tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+                      dplyr::pull(),
+                    
+                    parktime_median = currentdata %>%
+                      dplyr::group_by(zipcode) %>%
+                      dplyr::summarise(median(parktime)) %>%
+                      tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+                      dplyr::pull(),
+                    
+                    walktime_mean = currentdata %>%
+                      dplyr::group_by(zipcode) %>%
+                      dplyr::summarise(mean(walktime)) %>%
+                      tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+                      dplyr::pull(),
+                    
+                    walktime_median = currentdata %>%
+                      dplyr::group_by(zipcode) %>%
+                      dplyr::summarise(median(walktime)) %>%
+                      tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+                      dplyr::pull())
     
     result$parktime_mean <- sapply(result[, "parktime_mean"], round, 2)
     result$walktime_mean <- sapply(result[, "walktime_mean"], round, 2)
@@ -445,7 +454,7 @@ server <- function(input, output, session){
     # Basic descriptive statistics
     desc <- onewaytests::describe(thisFormula, inputdata)
     
-    ### Std. Error
+    ### Mean and standard error
     # Clumsily calculate mean, so that we can preserve column names in the next
     # phase. Adapt code from: https://stackoverflow.com/a/41029914/9455395
     stder <- aggregate(
@@ -453,15 +462,15 @@ server <- function(input, output, session){
       data = inputdata,
       FUN = function(x) c(mean = mean(x), "Std.Error" = plotrix::std.error(x)))
     
-    # Remove column mean 
+    # Remove column "mean" 
     stder <- subset(stder[[2]], select = -mean)
     desc <- cbind(desc, stder)
     
     # Confidence intervals for mean
     confs <- aggregate(
       thisFormula, data = inputdata, 
-      FUN = function(x) c("CI for mean, Lower Bound" = mean(x) - 2 * plotrix::std.error(x), 
-                          "CI for mean, Upper Bound" = mean(x) + 2 * plotrix::std.error(x)))
+      FUN = function(x) c("CI for mean, Lower Bound" = Rmisc::CI(x)[[3]], 
+                          "CI for mean, Upper Bound" = Rmisc::CI(x)[[1]]))
     confs <- confs[[2]]
     desc <- cbind(desc, confs)
     
@@ -478,8 +487,8 @@ server <- function(input, output, session){
     vect[3] <- mean(response)
     vect[4] <- sd(response)
     vect[5] <- plotrix::std.error(response)
-    vect[6] <- mean(response) - 2 * plotrix::std.error(response)
-    vect[7] <- mean(response) + 2 * plotrix::std.error(response)
+    vect[6] <- Rmisc::CI(response)[[3]]
+    vect[7] <- Rmisc::CI(response)[[1]]
     vect[8] <- min(response)
     vect[9] <- max(response)
     vect[10] <- quantile(response)[2]
@@ -488,17 +497,19 @@ server <- function(input, output, session){
     vect[13] <- moments::kurtosis(response)
     vect[14] <- sum(is.na(response))
     
-    # Add all values vector to desc, then name the new row and round all values in
-    # desc.
+    # Add "vect" to "desc" as a new row, then name the new row. Finally, set
+    # specific columns as integer to prevent useless decimal places in 
+    # tableOutput
     desc <- rbind(desc, vect)
-    row.names(desc)[nrow(desc)] <- "Total" #last row
-    desc <- round(desc, 3)
+    row.names(desc)[nrow(desc)] <- "Total" #name the last row
+    desc[int_cols] <- sapply(desc[int_cols], as.integer)
     desc
   }, 
   striped = TRUE,
   hover = TRUE,
   bordered = TRUE,
-  rownames = TRUE)
+  rownames = TRUE,
+  digits = 2)
   
   
   #### Histogram for parktime or walktime --------------------------------------
@@ -707,6 +718,7 @@ server <- function(input, output, session){
   bordered = TRUE,
   rownames = TRUE)
   
+  
   ### Brown-Forsythe test ------------------------------------------------------
   output$brownf <- renderPrint({
     
@@ -726,6 +738,7 @@ server <- function(input, output, session){
                                append = TRUE)
     cat(captured, sep = "\n")
   })
+  
   
   ### Context map --------------------------------------------------------------
   output$map <- renderggiraph({
@@ -786,9 +799,9 @@ server <- function(input, output, session){
     
     ggiraph(code = print(g2), 
             width_svg = 16.7, 
-            height_svg = 14.7, 
-            options = list(opts_sizing(rescale = FALSE)))
+            height_svg = 14.7)
   })
+  
   
   ### Interactive map ----------------------------------------------------------
   output$interactive <- renderggiraph({
@@ -927,8 +940,7 @@ server <- function(input, output, session){
     
     ggiraph(code = print(g), 
             width_svg = 16.7, 
-            height_svg = 14.7, 
-            options = list(opts_sizing(rescale = FALSE)))
+            height_svg = 14.7)
   })
 }
 
@@ -1186,7 +1198,7 @@ ui <- shinyUI(fluidPage(
       
       HTML("</div>"),
       HTML("<p style='font-size: 11px; color: grey; margin-top: -10px;'>",
-           "Analysis app version 7.5.2020</p>"),
+           "Analysis app version 8.5.2020</p>"),
       
       width = 3
     ),
