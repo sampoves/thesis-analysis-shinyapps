@@ -777,8 +777,8 @@ server <- function(input, output, session){
             legend.position = "bottom")
     
     ggiraph(code = print(g2), 
-            width_svg = 16, 
-            height_svg = 14, 
+            width_svg = 16.5, 
+            height_svg = 14.5, 
             options = list(opts_sizing(rescale = FALSE)))
   })
   
@@ -918,8 +918,8 @@ server <- function(input, output, session){
     }
     
     ggiraph(code = print(g), 
-            width_svg = 16, 
-            height_svg = 14, 
+            width_svg = 16.5, 
+            height_svg = 14.5, 
             options = list(opts_sizing(rescale = FALSE)))
   })
 }
@@ -948,11 +948,15 @@ ui <- shinyUI(fluidPage(
         height: 100%;
         scroll-behavior: smooth;
       }
+      hr {
+        max-width: 1200px;
+        margin-left: 0px;
+      }
       #brownf {
         color: #c8c8c8;
         background: #2e3338;
         border: 1px solid #1c1e22;
-        max-width: 1000px;
+        max-width: 1200px;
       }
       #descri {
         overflow-x: auto;
@@ -1018,6 +1022,9 @@ ui <- shinyUI(fluidPage(
       }
       .girafe_container_std {
         text-align: left;
+      }
+      svg {
+        border-radius: 4px;
       }
       .checkbox input[type=checkbox]:checked + span{
         text-decoration: line-through;
