@@ -469,14 +469,14 @@ server <- function(input, output, session){
     # Confidence intervals for mean
     confs <- aggregate(
       thisFormula, data = inputdata, 
-      FUN = function(x) c("CI for mean, Lower Bound" = Rmisc::CI(x)[[3]], 
-                          "CI for mean, Upper Bound" = Rmisc::CI(x)[[1]]))
+      FUN = function(x) c("CI for mean, lower bound" = Rmisc::CI(x)[[3]], 
+                          "CI for mean, upper bound" = Rmisc::CI(x)[[1]]))
     confs <- confs[[2]]
     desc <- cbind(desc, confs)
     
     # Reorder to SPSS descriptive statistics order
     desc <- desc[c("n", "Median", "Mean", "Std.Dev", "Std.Error", 
-                   "CI for mean, Lower Bound", "CI for mean, Upper Bound", "Min", 
+                   "CI for mean, lower bound", "CI for mean, upper bound", "Min", 
                    "Max", "25th", "75th", "Skewness", "Kurtosis", "NA")]
     
     # Add the total row. We will add total values for all columns in this manner,
@@ -976,6 +976,7 @@ ui <- shinyUI(fluidPage(
         color: #c8c8c8;
         background: #2e3338;
         border: 1px solid #1c1e22;
+        font-size: 14px;
         max-width: 1200px;
       }
       #descri {
