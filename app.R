@@ -1,12 +1,16 @@
 
-# Sampo Vesanen's Master's thesis statistical tests and visualisation
-#####################################################################
+#### Sampo Vesanen's Master's thesis statistical tests and visualisation #######
+
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 8.5.2020
+# 9.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
+
+
+
+# 1 Initialise -----------------------------------------------------------------
 
 # Libraries
 library(onewaytests)
@@ -30,8 +34,6 @@ library(mapproj)
 library(shinyWidgets)
 library(grid)
 
-
-
 # Python prepared data directories
 datapath <- "pythonshinyrecords.csv"
 postal_path <- "pythonshinypostal.csv"
@@ -46,7 +48,7 @@ source("app_funcs.R")
 
 
 
-#### Preparation --------------------------------------------------------------- 
+#### 2 Preparation ------------------------------------------------------------- 
 
 # These variables are used to subset dataframe thesisdata inside ShinyApp
 continuous <- c("parktime", "walktime") 
@@ -69,45 +71,54 @@ thesisdata <- read.csv(file = datapath,
                        encoding = "UTF-8", 
                        stringsAsFactors = TRUE) %>%
   
-  dplyr::mutate(parkspot = dplyr::recode(parkspot, 
-                                         `1` = "On the side of street",
-                                         `2` = "Parking lot",
-                                         `3` = "Parking garage",
-                                         `4` = "Private or reserved",
-                                         `5` = "Other"),
+  dplyr::mutate(parkspot = dplyr::recode(
+                  parkspot,
+                  `1` = "On the side of street",
+                  `2` = "Parking lot",
+                  `3` = "Parking garage",
+                  `4` = "Private or reserved",
+                  `5` = "Other"),
                 
-                likert = dplyr::recode(likert, 
-                                       `1` = "Extremely familiar",
-                                       `2` = "Moderately familiar",
-                                       `3` = "Somewhat familiar",
-                                       `4` = "Slightly familiar",
-                                       `5` = "Not at all familiar"),
+                likert = dplyr::recode(
+                  likert, 
+                  `1` = "Extremely familiar",
+                  `2` = "Moderately familiar",
+                  `3` = "Somewhat familiar",
+                  `4` = "Slightly familiar",
+                  `5` = "Not at all familiar"),
                 
-                timeofday = dplyr::recode(timeofday, 
-                                          `1` = "Weekday, rush hour",
-                                          `2` = "Weekday, other than rush hour",
-                                          `3` = "Weekend",
-                                          `4` = "Can't specify, no usual time"),
+                timeofday = dplyr::recode(
+                  timeofday, 
+                  `1` = "Weekday, rush hour",
+                  `2` = "Weekday, other than rush hour",
+                  `3` = "Weekend",
+                  `4` = "Can't specify, no usual time"),
                 
-                ua_forest = forcats::fct_relevel(ua_forest, 
-                                                 c("Predominantly forest", 
-                                                   "Mostly forest", "Moderate forest",
-                                                   "Some forest", "Scarce forest")),
+                ua_forest = forcats::fct_relevel(
+                  ua_forest, 
+                  c("Predominantly forest", 
+                    "Mostly forest", 
+                    "Moderate forest",
+                    "Some forest", 
+                    "Scarce forest")),
                 
                 # SYKE does not provide official translations for 
                 # "Yhdyskuntarakenteen vyohykkeet".
-                ykr_zone = forcats::fct_relevel(ykr_zone, 
-                                                c("keskustan jalankulkuvyohyke", 
-                                                  "keskustan reunavyohyke", 
-                                                  "alakeskuksen jalankulkuvyohyke", 
-                                                  "intensiivinen joukkoliikennevyohyke", 
-                                                  "joukkoliikennevyohyke",
-                                                  "autovyohyke", "novalue"))) %>%
+                ykr_zone = forcats::fct_relevel(
+                  ykr_zone, 
+                  c("keskustan jalankulkuvyohyke", 
+                    "keskustan reunavyohyke", 
+                    "alakeskuksen jalankulkuvyohyke", 
+                    "intensiivinen joukkoliikennevyohyke", 
+                    "joukkoliikennevyohyke",
+                    "autovyohyke", "novalue"))) %>%
   dplyr::select(-X)
 
 
 
-#### Context map for ShinyApp --------------------------------------------------
+#### 3 Context map for ShinyApp ------------------------------------------------
+
+#### 3.1 Subdivisions ----------------------------------------------------------
 
 # Prepare a context map for to visualise currently active areas in analysis
 # ShinyApp.
@@ -116,9 +127,12 @@ suuralue <- rgdal::readOGR(suuraluepath,
                            encoding = "UTF-8", 
                            stringsAsFactors = TRUE)
 
-# This preserves suuralue dataframe data
-suuralue_f <- merge(ggplot2::fortify(suuralue), as.data.frame(suuralue), 
-                    by.x = "id", by.y = 0)
+# This preserves suuralue dataframe data. Remove Description to preserve memory
+suuralue_f <- 
+  merge(ggplot2::fortify(suuralue), 
+        as.data.frame(suuralue), 
+        by.x = "id", 
+        by.y = 0)
 
 # Align area names with thesisdata$subdiv
 levels(suuralue_f$Name) <- c("Vantaa Aviapolis", "Helsinki Southern",
@@ -136,25 +150,6 @@ levels(suuralue_f$Name) <- c("Vantaa Aviapolis", "Helsinki Southern",
 
 thesisdata$subdiv <- factor(thesisdata$subdiv, levels = sort(levels(thesisdata$subdiv)))
 suuralue_f$Name <- factor(suuralue_f$Name, levels = sort(levels(suuralue_f$Name)))
-
-# Get municipality borders. Shapefile data is from Regional population density
-# 2012, Statistics Finland. 
-# http://urn.fi/urn:nbn:fi:csc-kata00001000000000000226
-muns_clipped <- 
-  rgdal::readOGR(munsclippedpath, stringsAsFactors = TRUE) %>%
-  sp::spTransform(., sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"))
-
-# Fortify SP DataFrame for ggplot
-muns_clipped_f <- merge(ggplot2::fortify(muns_clipped), as.data.frame(muns_clipped), 
-                        by.x = "id", by.y = 0)
-
-# Annotate municipalities in ggplot
-muns_cntr <- GetCentroids(muns_clipped_f, "nimi", "nimi")
-subdiv_cntr <- GetCentroids(suuralue_f, "Name", "Name")
-
-# Manually set better location for the annotation of Helsinki
-muns_cntr[2, 2] <- muns_cntr[2, 2] + 0.02
-muns_cntr$label <- c("Espoo", "Helsinki", "Kauniainen", "Vantaa")
 
 # Set color gradients for municipalities. Kauniainen will be a single color set 
 # below. These color gradients may be confusing. Investigate better colouring
@@ -184,9 +179,39 @@ suuralue_f$color <- c(rep(c_esp[1], amounts[1]), rep(c_esp[2], amounts[2]),
                       rep(c_van[7], amounts[23]))
 
 # Colors to factors and reorder subdivision names to facilitate ggplot
-suuralue_f <- 
-  suuralue_f %>% 
+suuralue_f <- suuralue_f %>% 
   dplyr::mutate(color = as.factor(color)) # to factor
+
+
+#### 3.2 Municipality borders --------------------------------------------------
+
+# Get municipality borders. Fortify SP DataFrame for ggplot. Remove unnecessary
+# columns to save memory.
+# Shapefile data is Regional population density 2012, Statistics Finland.
+# http://urn.fi/urn:nbn:fi:csc-kata00001000000000000226.
+muns_crs <- sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
+
+muns_clipped <- 
+  rgdal::readOGR(munsclippedpath, stringsAsFactors = TRUE) %>%
+  sp::spTransform(., muns_crs)
+
+# Fortify SP DataFrame for ggplot. Remove unnecessary columns to save memory
+muns_clipped_f <- merge(ggplot2::fortify(muns_clipped), 
+                        as.data.frame(muns_clipped), 
+                        by.x = "id", 
+                        by.y = 0) %>%
+  dplyr::select(-c(namn, vaestontih, km2, vakiluku))
+
+
+#### 3.3 Annotation ------------------------------------------------------------
+
+# Annotate municipalities for ggplot2
+muns_cntr <- GetCentroids(muns_clipped_f, "nimi", "nimi")
+subdiv_cntr <- GetCentroids(suuralue_f, "Name", "Name")
+
+# Manually set better location for the annotation of Helsinki
+muns_cntr[2, 2] <- muns_cntr[2, 2] + 0.02
+muns_cntr$label <- c("Espoo", "Helsinki", "Kauniainen", "Vantaa")
 
 # name labels here so that all the reordering doesn't mix up stuff
 subdiv_cntr$label <- unique(suuralue_f$Name)
@@ -205,7 +230,7 @@ subdiv_cntr[16, "label"] <- ""
 
 
 
-### Interactive map for ShinyApp ----------------------------------------------- 
+### 4 Interactive map for ShinyApp --------------------------------------------- 
 # Created with the help of:
 # https://bhaskarvk.github.io/user2017.geodataviz/notebooks/03-Interactive-Maps.nb.html
 
@@ -230,38 +255,41 @@ largest_ykr_no <- as.numeric(apply(postal[, 5:11], 1, max)) * 100
 postal <- cbind(postal, largest_ykr = paste(largest_ykr, largest_ykr_no))
 
 # "postal" geometries are in well-known text format. Some processing is needed to
-# utilise these polygons in R.
-crs <- sp::CRS("+init=epsg:3067")
-geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs) #rgeos::readWKT()
+# utilise these polygons in R. readWKT() is of rgeos
+postal_crs <- sp::CRS("+init=epsg:3067")
+geometries <- lapply(postal[, "geometry"], "readWKT", p4s = postal_crs) 
 sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
 row.names(postal) <- postal[, 1]
 
 data <- SpatialPolygonsDataFrame(
   SpatialPolygons(unlist(lapply(sp_tmp_ID, function(x) x@polygons)), 
-                  proj4string = crs), data = postal)
+                  proj4string = postal_crs), data = postal)
 
 data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id", 
                 by.y = 0)
 
-# Get municipality borders from shapefile
+# Get municipality borders from shapefile.
 muns <- 
   rgdal::readOGR(munspath, stringsAsFactors = TRUE) %>%
-  sp::spTransform(., crs)
+  sp::spTransform(., postal_crs)
 
-munsf <- merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
+# Fortify muns for ggplot. Remove unnecessary columns to save memory
+muns_f <- 
+  merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0) %>%
+  dplyr::select(-c(namn, vaestontih, km2, vakiluku))
 
 
 
-#### Analysis ShinyApp ---------------------------------------------------------
+#### 5 Analysis ShinyApp -------------------------------------------------------
 
 # This ShinyApp is a versatile tool to study the thesis survey data. One can
 # choose parameters with lots of freedom and exclude options as seen fit.
 
 server <- function(input, output, session){
   
-  #### Listener functions ------------------------------------------------------
+  #### 5.1 Listener functions --------------------------------------------------
   
-  # Listen to clear subdivs button. Resetting uses library shinyjs -------------
+  # 5.1.1 Listen to clear subdivs button. Resetting uses library shinyjs -------
   observeEvent(input$resetSubdivs, {
     reset("subdivGroup")
   })
@@ -272,7 +300,7 @@ server <- function(input, output, session){
   })
   
   
-  #### Reactive data -----------------------------------------------------------
+  #### 5.1.2 Reactive data -----------------------------------------------------
   
   # currentdata(), currentpostal() and current_data_f() are reactive objects
   # made to keep track of changes the Shiny application. Most of the app uses
@@ -283,22 +311,24 @@ server <- function(input, output, session){
   # DataFrame. Use currentdata() in the rest of the application to not interfere
   # with the original dataset.
   currentdata <- reactive(
-    thesisdata %>%
-      dplyr::filter(parktime <= input$parktime_max,
-                    walktime <= input$walktime_max))
+    
+    # Use ! negation to remove checkGroup and subdivGroup inputs from 
+    # thesisdata.
+    dplyr::filter(thesisdata,
+                  !(!!rlang::sym(input$expl)) %in% input$checkGroup,
+                  !subdiv %in% input$subdivGroup,
+                  parktime <= input$parktime_max,
+                  walktime <= input$walktime_max)
+  )
   
   
-  # currentpostal() calculates, when needed, answer counts, means, and medians
-  # for the values currently active in currentdata(). This is needed to make
-  # the interactive map tooltip values responsive to changes. In this phase,
-  # we calculate all the required data, the mapping part is in current_data_f()
+  # currentpostal() recalculates, when needed, new answer counts, means, and 
+  # medians for the values currently active in currentdata(). This is needed to 
+  # make the interactive map tooltip values responsive to changes. In this phase,
+  # we calculate the required data, the actual mapping part is in current_data_f()
   currentpostal <- reactive({
     
     currentdata <- currentdata()
-    
-    # this makes currentdata compliant with changes to checkGroup and subdivGroup
-    currentdata <- currentdata[!currentdata[[input$expl]] %in% c(input$checkGroup), ]
-    currentdata <- currentdata[!currentdata$subdiv %in% c(input$subdivGroup), ]
     
     # tidyr::complete() helps find missing zipcodes and give them n=0
     result <- postal %>%
@@ -330,7 +360,17 @@ server <- function(input, output, session){
                       dplyr::group_by(zipcode) %>%
                       dplyr::summarise(median(walktime)) %>%
                       tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
-                      dplyr::pull())
+                      dplyr::pull(),
+                    
+                    # this enables turning off subdivs and the result being
+                    # visible on interactive map
+                    ua_forest = currentdata %>%
+                      dplyr::group_by(zipcode) %>%
+                      dplyr::summarise(mean(ua_forest_vals)) %>%
+                      tidyr::complete(zipcode = zips, fill = list(n = NA)) %>%
+                      dplyr::pull()) %>%
+      
+      dplyr::mutate(ua_forest = ua_forest * 100)
     
     result$parktime_mean <- sapply(result[, "parktime_mean"], round, 2)
     result$walktime_mean <- sapply(result[, "walktime_mean"], round, 2)
@@ -340,25 +380,29 @@ server <- function(input, output, session){
   
   # current_data_f() produces the currently needed interactive map out of the
   # data contained in currentpostal(). This is a copy of the code above, seen
-  # in "Interactive map fro ShinyApp". Please See code comments in the original.
+  # in "Interactive map for ShinyApp". Please See code comments in the original.
   current_data_f <- reactive({
     
-    postal <- currentpostal()
+    currentpostal <- currentpostal()
     
-    geometries <- lapply(postal[, "geometry"], "readWKT", p4s = crs)
-    sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(postal[, 1]))
-    row.names(postal) <- postal[, 1]
+    geometries <- lapply(currentpostal[, "geometry"], "readWKT", p4s = postal_crs)
+    sp_tmp_ID <- mapply(sp::spChFIDs, geometries, as.character(currentpostal[, 1]))
+    row.names(currentpostal) <- currentpostal[, 1]
     
     data <- sp::SpatialPolygonsDataFrame(
       sp::SpatialPolygons(unlist(lapply(sp_tmp_ID, function(x) x@polygons)),
-                          proj4string = crs), data = postal)
-    data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id", by.y = 0)
+                          proj4string = postal_crs), data = currentpostal)
+    
+    data_f <- merge(ggplot2::fortify(data), 
+                    as.data.frame(data), 
+                    by.x = "id", 
+                    by.y = 0)
     data_f
   })
   
   
   observe({
-    # Detect changes in selectInput to modify available check boxes ------------
+    # 5.1.3 Detect changes in selectInput to modify available check boxes ------
     x <- input$expl
     
     updateCheckboxGroupInput(
@@ -369,7 +413,7 @@ server <- function(input, output, session){
       choiceValues = levels(thesisdata[, x]),)
     
     
-    # Determine availability of barplot ----------------------------------------
+    # 5.1.4 Determine availability of barplot ----------------------------------
     
     # aka availability of "Distribution of ordinal variables"
     available <- c("likert", "parkspot", "timeofday", "ua_forest", "ykr_zone", 
@@ -381,7 +425,7 @@ server <- function(input, output, session){
       choices = available[!available == x])
     
     
-    # Do not allow selection of all checkboxes in Jenks ------------------------
+    # 5.1.5 Do not allow selection of all checkboxes in Jenks ------------------
     if(length(input$kunta) == 3) {
       threevalues <<- input$kunta
     }
@@ -394,7 +438,7 @@ server <- function(input, output, session){
     }
     
     
-    # A clumsy implementation to listen for too large jenks breaks -------------
+    # 5.1.6 A clumsy implementation to listen for too large jenks breaks -------
     inputpostal <- postal[!postal$kunta %in% c(input$kunta), ]
     
     if(input$karttacol == "jenks_ua_forest") {
@@ -430,25 +474,25 @@ server <- function(input, output, session){
   
   
   
-  #### Descriptive statistics --------------------------------------------------
+  #### 5.2 Descriptive statistics ----------------------------------------------
   output$descri <- renderTable({
     
     # Vital variables
-    thisFormula <- as.formula(paste(input$resp, '~', input$expl))
     resp_col <- input$resp
     expl_col <- input$expl
+    thisFormula <- as.formula(paste(resp_col, '~', expl_col))
     
     # In each output, define reactive variable as "inpudata". According to
     # this Stack Overflow answer, it prevents errors down the line
     # https://stackoverflow.com/a/53989498/9455395
-    # And as a reminder, currentdata() is called to keep track of maximum
-    # parktime and walktime values
+    
+    # Reminder: the reactive currentdata() is called to keep track of maximum
+    # allowed parktime and walktime values, and see changes in input$checkGroup 
+    # and input$subdivGroup
     inputdata <- currentdata()
     
     # Take subdiv checkbox group into account
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), 
-                           !names(inputdata) %in% supportcols]
-    inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
+    inputdata <- inputdata[, !names(inputdata) %in% supportcols]
     response <- inputdata[[resp_col]]
     
     # Basic descriptive statistics
@@ -468,7 +512,8 @@ server <- function(input, output, session){
     
     # Confidence intervals for mean
     confs <- aggregate(
-      thisFormula, data = inputdata, 
+      thisFormula, 
+      data = inputdata, 
       FUN = function(x) c("CI for mean, lower bound" = Rmisc::CI(x)[[3]], 
                           "CI for mean, upper bound" = Rmisc::CI(x)[[1]]))
     confs <- confs[[2]]
@@ -512,7 +557,7 @@ server <- function(input, output, session){
   digits = 2)
   
   
-  #### Histogram for parktime or walktime --------------------------------------
+  #### 5.3 Histogram for parktime or walktime ----------------------------------
   output$hist <- renderPlot({
     
     resp_col <- input$resp
@@ -520,8 +565,6 @@ server <- function(input, output, session){
     binwidth <- input$bin
     
     inputdata <- currentdata()
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), ]
-    inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     resp_vect <- inputdata[[resp_col]] # for vertical line labels
     
     p <- ggplot(inputdata, aes(x = !!sym(resp_col))) + 
@@ -591,7 +634,7 @@ server <- function(input, output, session){
   })
   
   
-  #### Boxplot -----------------------------------------------------------------
+  #### 5.4 Boxplot -------------------------------------------------------------
   output$boxplot <- renderPlot({
     
     expl_col <- input$expl
@@ -600,8 +643,6 @@ server <- function(input, output, session){
     
     # Listen to user choices
     inputdata <- currentdata()
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), ]
-    inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
     legendnames <- levels(unique(inputdata[[expl_col]]))
     
@@ -624,18 +665,16 @@ server <- function(input, output, session){
   })
   
   
-  #### Barplot -----------------------------------------------------------------
+  #### 5.5 Barplot -------------------------------------------------------------
   output$barplot <- renderPlot({
     
     # See distribution of ordinal variables through a grouped bar plot
     expl_col <- input$expl
     barplotval <- input$barplot
-    yax <- paste("sum of", barplotval)
+    yax <- paste("count of", barplotval)
     
     # Listen to user choices
     inputdata <- currentdata()
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), ]
-    inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
     # Plot maximum y tick value. Use dplyr to group the desired max amount.
     # In dplyr, use !!as.symbol(var) to signify that we are using variables
@@ -672,15 +711,12 @@ server <- function(input, output, session){
   })
   
   
-  #### Levene test -------------------------------------------------------------
+  #### 5.6 Levene test ---------------------------------------------------------
   output$levene <- renderTable({
     
     expl_col <- input$expl
     thisFormula <- as.formula(paste(input$resp, "~", expl_col))
-    
     inputdata <- currentdata()
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), ]
-    inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
     levene <- car::leveneTest(thisFormula, inputdata, center = mean)
     
@@ -694,15 +730,12 @@ server <- function(input, output, session){
   rownames = TRUE)
   
   
-  #### One-way ANOVA -----------------------------------------------------------
+  #### 5.7 One-way ANOVA -------------------------------------------------------
   output$anova <- renderTable({
     
     expl_col <- input$expl
     thisFormula <- as.formula(paste(input$resp, "~", expl_col))
-    
     inputdata <- currentdata()
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup), ]
-    inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
     
     #### One-way ANOVA
     res.aov <- aov(thisFormula, data = inputdata)
@@ -719,7 +752,7 @@ server <- function(input, output, session){
   rownames = TRUE)
   
   
-  ### Brown-Forsythe test ------------------------------------------------------
+  ### 5.8 Brown-Forsythe test --------------------------------------------------
   output$brownf <- renderPrint({
     
     resp_col <- input$resp
@@ -727,9 +760,7 @@ server <- function(input, output, session){
     thisFormula <- as.formula(paste(resp_col, "~", expl_col))
     
     inputdata <- currentdata()
-    inputdata <- inputdata[!inputdata[[expl_col]] %in% c(input$checkGroup),
-                           !names(inputdata) %in% supportcols]
-    inputdata <- inputdata[!inputdata$subdiv %in% c(input$subdivGroup), ]
+    inputdata <- inputdata[, !names(inputdata) %in% supportcols]
     
     # bf.test() works so that the information we want is only printed to
     # console. Capture that output and place it in a variable
@@ -740,7 +771,7 @@ server <- function(input, output, session){
   })
   
   
-  ### Context map --------------------------------------------------------------
+  ### 5.9 Context map ----------------------------------------------------------
   output$map <- renderggiraph({
     
     # Count active subdivs
@@ -803,7 +834,7 @@ server <- function(input, output, session){
   })
   
   
-  ### Interactive map ----------------------------------------------------------
+  ### 5.10 Interactive map -----------------------------------------------------
   output$interactive <- renderggiraph({
     
     # Use reactive data_f and postal
@@ -908,7 +939,7 @@ server <- function(input, output, session){
                         na.value = "#ebebeb") +
       
       # Municipality borders
-      geom_polygon(data = munsf,
+      geom_polygon(data = muns_f,
                    aes(long, lat, group = group),
                    linetype = "longdash",
                    color = alpha("black", 0.6), 
@@ -945,13 +976,13 @@ server <- function(input, output, session){
 }
 
 
-### ShinyApp UI elements ------------------------------------------------------- 
+### 6 ShinyApp UI elements ----------------------------------------------------- 
 ui <- shinyUI(fluidPage(
   useShinyjs(),
   theme = shinytheme("slate"),
   
   
-  ### ShinyApp UI CSS ---------------------------------------------------------- 
+  ### 6.1 ShinyApp UI CSS ------------------------------------------------------ 
   
   # Edit various CSS features of the ShinyApp: 
   # - the Brown-Forsythe test box 
@@ -1055,7 +1086,7 @@ ui <- shinyUI(fluidPage(
   ),
   
   
-  ### Sidebar layout -----------------------------------------------------------
+  ### 6.2 Sidebar layout -------------------------------------------------------
   titlePanel(NULL, windowTitle = "Sampo Vesanen MSc thesis research survey results"),
   sidebarLayout(
     sidebarPanel(
@@ -1199,13 +1230,13 @@ ui <- shinyUI(fluidPage(
       
       HTML("</div>"),
       HTML("<p style='font-size: 11px; color: grey; margin-top: -10px;'>",
-           "Analysis app version 8.5.2020</p>"),
+           "Analysis app version 9.5.2020</p>"),
       
       width = 3
     ),
     
     
-    ### mainPanel layout -------------------------------------------------------
+    ### 6.3 mainPanel layout ---------------------------------------------------
     mainPanel(
       h2("Sampo Vesanen MSc thesis research survey results"),
       HTML("<p style='max-width: 1200px;'>Welcome to the analysis application",
