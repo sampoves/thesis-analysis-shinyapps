@@ -738,6 +738,9 @@ server <- function(input, output, session){
     levene <- car::leveneTest(thisFormula, inputdata, center = mean)
     
     res <- SigTableToShiny(levene, TRUE)
+    
+    # Present "Df" as integer to prevent decimal places in app
+    res["Df"] <- sapply(res["Df"], as.integer)
     res
   }, 
   digits = 6,
@@ -760,6 +763,8 @@ server <- function(input, output, session){
     
     # Use this function to communicate table correctly to Shiny
     anovasummary <- SigTableToShiny(anovasummary, FALSE)
+    
+    anovasummary["Df"] <- sapply(anovasummary["Df"], as.integer)
     anovasummary
   },
   digits = 6,
@@ -1217,7 +1222,7 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       HTML("<div id='levenelink'>"),
-      HTML("<h3>5 Test of Homogeneity of Variances (Levene's test)&ensp;",
+      HTML("<h3>5 Test of homogeneity of variances (Levene's test)&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       p("Levene value needs to be at least 0.05 for ANOVA test to be meaningful. If under 0.05, employ Brown-Forsythe test."),
