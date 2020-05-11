@@ -669,7 +669,12 @@ server <- function(input, output, session){
       ggplot(inputdata, aes(x = get(expl_col), 
                             y = factor(get(barplotval)), 
                             fill = get(barplotval))) +
-      geom_bar(aes(y = stat(count)), position = "dodge") + 
+      
+      # Setting width and position_dodge adds space between bars
+      geom_bar(aes(y = stat(count)),
+               width = 0.8,
+               position = position_dodge(width = 0.9)) +
+      
       scale_y_continuous(breaks = seq(0, maximum, by = tick_interval),
                          expand = expansion(mult = c(0, .1))) +
       xlab(expl_col) +
@@ -683,15 +688,8 @@ server <- function(input, output, session){
     
     # Use RColorBrewer color scale. Paired has 12 set colors, interpolate if
     # there are more values to map than that.
-    legendnames <- length(unique(inputdata[[barplotval]]))
-    
-    if (legendnames > 12) {
-      cols <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))
-      myPal <- cols(legendnames)
-      plo <- plo + scale_fill_manual(name = barplotval, values = myPal)
-    } else {
-      plo <- plo + scale_fill_brewer(palette = "Paired")
-    }
+    legendnames <- unique(inputdata[[barplotval]])
+    plo <- InterpolateGgplotColors(plo, legendnames, 12, "Paired")
     
     plo
   })
@@ -706,7 +704,6 @@ server <- function(input, output, session){
     
     # Listen to user choices
     inputdata <- currentdata()
-    
     legendnames <- levels(unique(inputdata[[expl_col]]))
     
     # ggplot2 plotting. Rotate labels if enough classes. Use scale_fill_hue()
@@ -720,13 +717,7 @@ server <- function(input, output, session){
     
     # Use RColorBrewer color scale. Set3 has 12 set colors, interpolate if
     # there are more values to map than that.
-    if (length(legendnames > 12)) {
-      cols <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))
-      myPal <- cols(length(legendnames))
-      p <- p + scale_fill_manual(values = myPal)
-    } else {
-      p <- p + scale_fill_brewer(palette = "Set3")
-    }
+    p <- InterpolateGgplotColors(p, legendnames, 12, "Set3")
     
     # Diagonal labels if more values to map than five
     if(length(legendnames) > 5) {
@@ -1008,9 +999,9 @@ ui <- shinyUI(fluidPage(
   theme = shinytheme("slate"),
   
   
-  ### 6.1 ShinyApp UI CSS ------------------------------------------------------ 
+  ### 6.1 ShinyApp header ------------------------------------------------------ 
   
-  # Edit various CSS features of the ShinyApp: 
+  # Edit various features of the ShinyApp: 
   # - sidebarPanel (form.well) width. sidebarPanel width setting is important 
   #   because the long explanations would break it otherwise. 
   # - manually set sidebarPanel z-index to make the element always appear on top
@@ -1018,7 +1009,10 @@ ui <- shinyUI(fluidPage(
   # - pointer-events: none; makes zipcode labels invisible to the cursor
   # - noselect makes selecting ggiraph elements not possible
   # - :last-child pseudo-selector makes last row of descriptive statistics bold
-  tags$head(htmltools::includeCSS(csspath)),
+  tags$head(tags$link(rel = "stylesheet", 
+                      type = "text/css", 
+                      href = "https://use.fontawesome.com/releases/v5.8.1/css/all.css"),
+            htmltools::includeCSS(csspath)),
   
   
   ### 6.2 Sidebar layout -------------------------------------------------------
@@ -1041,7 +1035,7 @@ ui <- shinyUI(fluidPage(
       HTML("</div>"),
       
       # Set allowed maximum for parktime and walktime. Default is 60 for both.
-      HTML("<div id='contents'>"),
+      HTML("<div id='stats-settings-link'><div id='contents'>"),
       sliderInput(
         "parktime_max",
         HTML("<p style='font-size: 9px'>(These selections affect sections", 
@@ -1085,10 +1079,10 @@ ui <- shinyUI(fluidPage(
         "Select inactive groups in current explanatory variable",
         choiceNames = c("Item A", "Item B", "Item C"),
         choiceValues = c("a", "b", "c")),
-      HTML("</div>"),
+      HTML("</div></div>"),
       
       # Allow user to access histogram binwidth
-      HTML("<div id='contents'>"),
+      HTML("<div id='hist-settings-link'><div id='contents'>"),
       sliderInput(
         "bin",
         HTML("Select binwidth for the current response variable",
@@ -1096,7 +1090,7 @@ ui <- shinyUI(fluidPage(
         min = 1, 
         max = 10, 
         value = 2),
-      HTML("</div>"),
+      HTML("</div></div>"),
       
       # Provide user possibility to see distribution of answers within the
       # ordinal variables.
@@ -1106,7 +1100,7 @@ ui <- shinyUI(fluidPage(
         condition = 
           "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
         
-        HTML("<div id='contents'>"),
+        HTML("<div id='barplot-settings-link'><div id='contents'>"),
         selectInput(
           "barplot", 
           HTML("Y axis for Distribution of ordinal variables <a",
@@ -1114,11 +1108,12 @@ ui <- shinyUI(fluidPage(
                "(3 Distribution of ordinal variables)</a>"),
           names(thesisdata[c("zipcode", "likert", "walktime")]),
         ),
-        HTML("</div>")),
+        HTML("</div></div>")
+      ),
       
       # Select to inactivate subdivs. Overrides all options (except interactive 
       # map) 
-      HTML("<div id='contents'>"),
+      HTML("<div id='subdiv-settings-link'><div id='contents'>"),
       checkboxGroupInput(
         "subdivGroup",
         HTML("Select inactive subdivisions <p style='font-size: 9px'>",
@@ -1131,11 +1126,10 @@ ui <- shinyUI(fluidPage(
       actionButton(
         "resetSubdivs", 
         "Clear inactive subdivisions"),
-      HTML("</div>"),
+      HTML("</div></div>"),
       
       # Interactive map jenks breaks options
-      HTML("<div id='intmap-settings-link'>"),
-      HTML("<div id='contents'>"),
+      HTML("<div id='intmap-settings-link'><div id='contents'>"),
       checkboxGroupInput(
         "kunta",
         HTML("Select extent for the interactive map <a",
@@ -1163,8 +1157,7 @@ ui <- shinyUI(fluidPage(
         max = 8, 
         value = 5),
       
-      HTML("</div>"),
-      HTML("</div>"),
+      HTML("</div></div>"),
       
       HTML("<p style='font-size: 11px; color: grey; margin-top: -10px;'>",
            "Analysis app version 11.5.2020</p>"),
@@ -1184,13 +1177,18 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       HTML("<div id='descrilink'>"),
-      h3("1 Descriptive statistics"),
+      HTML("<h3>1 Descriptive statistics&ensp;",
+           "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       tableOutput("descri"),
       HTML("</div>"),
       hr(),
       
       HTML("<div id='histlink'>"),
-      h3("2 Histogram"),
+      HTML("<h3>2 Histogram&ensp;",
+           "<a href='#hist-settings-link'><i class='icon wrench' title='Go to histogram settings'></i></a>",           
+           "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       p("For the response (continuous) variables"),
       plotOutput("hist"),
       HTML("</div>"),
@@ -1200,21 +1198,28 @@ ui <- shinyUI(fluidPage(
       conditionalPanel(
         condition = 
           "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-        h3("3 Distribution of ordinal variables"),
+        HTML("<h3>3 Distribution of ordinal variables&ensp;",
+             "<a href='#barplot-settings-link'><i class='icon wrench' title='Go to barplot settings'></i></a>",           
+             "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+             "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
         p("This plot appears when likert, parkspot or timeofday is selected as explanatory (ordinal) variable"),
         plotOutput("barplot"),
-        HTML("</div>"),
         hr()
       ),
+      HTML("</div>"),
       
       HTML("<div id='boxplotlink'>"),
-      h3("4 Boxplot"),
+      HTML("<h3>4 Boxplot&ensp;",
+           "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       plotOutput("boxplot", height = "500px"),
       HTML("</div>"),
       hr(),
       
       HTML("<div id='levenelink'>"),
-      h3("5 Test of Homogeneity of Variances (Levene's test)"),
+      HTML("<h3>5 Test of Homogeneity of Variances (Levene's test)&ensp;",
+           "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       p("Levene value needs to be at least 0.05 for ANOVA test to be meaningful. If under 0.05, employ Brown-Forsythe test."),
       tableOutput("levene"),
       p("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1", 
@@ -1223,7 +1228,9 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       HTML("<div id='anovalink'>"),
-      h3("6 Analysis of variance (ANOVA)"),
+      HTML("<h3>6 Analysis of variance (ANOVA)&ensp;",
+           "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       tableOutput("anova"),
       p("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1", 
         style = "font-size:12px;margin-top:-12px"),
@@ -1231,7 +1238,9 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       HTML("<div id='brownlink'>"),
-      h3("7 Brown-Forsythe test"),
+      HTML("<h3>7 Brown-Forsythe test&ensp;",
+           "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       p("Please note that Brown-Forsythe test fails when selected response", 
         "variable maximum value is set to 0. The test requires a p.value that's", 
         "not NaN."),
@@ -1240,19 +1249,20 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       HTML("<div id='maplink'>"),
-      h3("8 Active subdivisions"),
+      HTML("<h3>8 Active subdivisions&ensp;",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       ggiraphOutput("map"),
       HTML("</div>"),
       hr(),
       
       HTML("<div id='intmaplink'>"),
-      h3("9 Survey results on research area map"),
-      HTML("<a style='font-size: 12px' href='#intmap-settings-link'>",
-           "View the settings for this map</a>"),
+      HTML("<h3>9 Survey results on research area map&ensp;",
+           "<a href='#intmap-settings-link'><i class='icon wrench' title='Go to interactive map settings'></i></a>",
+           "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
+           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a></h3>"),
       HTML("<div class='noselect'>"),
       ggiraphOutput("interactive"),
-      HTML("</div>"),
-      HTML("</div>"),
+      HTML("</div></div>"),
       hr(),
       
       h3("Data providers"),
