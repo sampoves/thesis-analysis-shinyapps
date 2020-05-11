@@ -1,13 +1,10 @@
 
 # Sampo Vesanen's Master's thesis statistical tests and visualisation
-#####################################################################
-#### Stats and visualisation functions and essential variables
+# Stats and visualisation functions and essential variables
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 8.5.2020
-
-
+# 11.5.2020
 
 # Initialise
 library(onewaytests)
@@ -15,6 +12,9 @@ library(car)
 library(plotrix)
 library(moments)
 library(rlang)
+library(classInt)
+library(ggplot2)
+library(RColorBrewer)
 
 
 
@@ -71,6 +71,27 @@ GetCentroids <- function(fortified, unique_id, nominator) {
 
 
 
+InterpolateGgplotColors <- function(plot_obj, active_items, palette_max_cols, 
+                                    palettename) {
+  
+  # Use RColorBrewer for the color scale in ggplot. If there are more active 
+  # items to be mapped than the maximum color amount in selected RColorBrewer 
+  # palette, interpolate the extra colors.
+  if (length(active_items) > palette_max_cols) {
+    cols <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(palette_max_cols, palettename))
+    myPal <- cols(length(active_items))
+    result <- plot_obj + scale_fill_manual(values = myPal)
+    
+    # Selected RColorBrewer palette works without any tricks
+  } else {
+    result <- plot_obj + scale_fill_brewer(palette = palettename)
+  }
+  
+  return(result)
+}
+
+
+
 CreateJenksColumn <- function(fortified, postal, datacol, newcolname, classes_n = 5) {
   
   # Use this function to create a column in fortified dataframe that can be
@@ -94,9 +115,9 @@ CreateJenksColumn <- function(fortified, postal, datacol, newcolname, classes_n 
   # classes$brk has to be wrapped with unique(), otherwise we can't get more
   # than six classes for parktime_median or walktime_median
   result <- fortified %>%
-    mutate(!!newcolname := cut(!!rlang::sym(datacol), 
-                               unique(classes$brks), 
-                               include.lowest = T))
+    dplyr::mutate(!!newcolname := cut(!!rlang::sym(datacol), 
+                                      unique(classes$brks), 
+                                      include.lowest = T))
   
   # Reverse column values to enable rising values from bottom to top in ggplot.
   # In ggplot, use scale_fill_brewer(direction = -1) with this operation to flip
