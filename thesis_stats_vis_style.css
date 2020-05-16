@@ -9,15 +9,57 @@ html, body {
 	scroll-behavior: smooth;
 	position: relative;
 }
-p, h3 {
-	max-width: 1200px;
+.col-sm-8 { /* mainPanel() master */
+	max-width: 1225px;
 }
 hr {
-	max-width: 1200px;
 	margin-left: 0px;
 }
 
-/* sidebarPanel() 
+/*------------------*/
+/* Scrollbar styles */
+/*------------------*/
+
+/* mainpanel scrollbar */
+::-webkit-scrollbar-track {
+	-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.4);
+	border-radius: 10px;
+	background-color: #1c1e22;
+}
+::-webkit-scrollbar {
+	width: 14px;
+	background-color: #272b30;
+}
+::-webkit-scrollbar:horizontal {
+	height: 14px;
+}
+::-webkit-scrollbar-thumb {
+	border-radius: 10px;
+	-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.4);
+	background-color: #49515a;
+}
+::-webkit-scrollbar-thumb:hover {
+   background-color: #515c69;
+}
+/* sidebar scrollbar */
+#sidebar::-webkit-scrollbar {
+	background-color: #1c1e22;
+}
+#sidebar::-webkit-scrollbar-track {
+	background-color: #15171d;
+}
+::-webkit-resizer {
+	width: 0;
+	height: 0;
+	border-top: 7px solid #1c1e22;
+	border-left: 12px solid #515c69;
+	border-bottom: 7px solid #1c1e22;
+	background-color: #1c1e22;
+}
+
+/*----------------*/
+/* sidebarPanel() */
+/*------------------
 - set sidebarPanel (form.well) width. sidebarPanel width setting is important because the 
 long explanations would break it otherwise
 - manually set sidebarPanel z-index to make the element always appear on top
@@ -42,26 +84,36 @@ form.well {
 	padding: 4px;
 	margin-bottom: 15px;
 }
+#linkheading_t, #linkheading_b {
+	margin-bottom: -2px;
+	font-weight: bold;
+}
+#linkheading_b {
+	margin-top: 6px;
+}
+#version-info {
+	font-size: 11px; 
+	color: grey; 
+	margin-top: -10px;
+}
+#smalltext {
+	font-size: 9px;
+}
+/* reset buttons */
 #resetSubdivs, #resetParkWalk {
 	width: 100%;
 	padding: 6px 0px 8px 0px;
 	white-space: normal;
 }
-#linkheading_b {
-	margin-bottom: -2px;
-	margin-top: 6px;
-	font-weight: bold;
-}
-#linkheading_t {
-	margin-bottom: -2px;
-	font-weight: bold;
-}
+/* checkbox strikethrough */
 .checkbox input[type=checkbox]:checked + span {
 	text-decoration: line-through;
 	color: dimgray;
 }
 
-/* mainPanel()
+/*-------------*/
+/* mainPanel() */
+/*---------------
 - pointer-events: none; makes zipcode labels invisible to the cursor
 - noselect makes selecting ggiraph elements not possible
 - :last-child pseudo-selector makes last row of descriptive statistics bold */
@@ -70,16 +122,13 @@ form.well {
 	background: none;
 	border: none;
 	text-align: center; /* eyeslash and eye are of different width */
-	width: 45px;
-}
-#descri, #boxplot, #barplot, #hist, #brownf {
-	max-width: 1200px;
+	width: 45px; /* therefore align and give button fixed width */
 }
 #descri {
 	overflow-x: auto;
 	max-height: 80vh;
 }
-#descri tr:last-child { 
+#descri tr:last-child { /* bold last row in descri */
 	font-weight: bold;
 }
 #brownf {
@@ -87,6 +136,10 @@ form.well {
 	background: #2e3338;
 	border: 1px solid #1c1e22;
 	font-size: 14px;
+}
+#signif {
+	font-size: 12px;
+	margin-top: -12px;
 }
 text {
 	pointer-events: none;
@@ -113,7 +166,9 @@ svg, img {
 	border-radius: 4px;
 }
 
-/* Font Awesome utilisation.
+/*--------------------------*/
+/* Font Awesome utilisation */
+/*----------------------------
 Common properties for Font Awesome: All of these settings are required to make icons 
 render reliably */
 .icon::before {
@@ -148,22 +203,24 @@ render reliably */
 	color: white;
 }
 
+/*---------------------------------*/
 /* Anchor link highlight animation */
+/*---------------------------------*/
 @keyframes highlight {
 	0% {
 		background: none;
-		max-width: 1200px;
+		max-width: 100%;
 	}
 	50% {
 		background: #67727f;
-		max-width: 1200px;
+		max-width: 100%;
 		-moz-box-shadow: 0px 0px 15px rgba(140, 150, 162, 1);
 		-webkit-box-shadow: 0px 0px 15px rgba(140, 150, 162, 1);
 		box-shadow: 0px 0px 15px rgba(140, 150, 162, 1);
 	}
 	100% {
 		background: none;
-		max-width: 1200px;
+		max-width: 100%;
 	}
 }
 #descrilink, #histlink, #barplotlink, #boxplotlink, #levenelink, 
@@ -172,11 +229,10 @@ render reliably */
 	scroll-margin-top: 40px; /* Arrive 40px above the anchor position */
 	border-radius: 5px;
 }
-#descrilink:target, #histlink:target, #barplotlink:target, #boxplotlink:target, 
-#levenelink:target, #anovalink:target, #brownlink:target, #maplink:target, 
-#intmaplink:target, #stats-settings-link:target, #hist-settings-link:target, 
-#barplot-settings-link:target, #subdiv-settings-link:target, 
-#intmap-settings-link:target {
+.animate {
 	animation: highlight 0.75s ease-in-out;
 	animation-delay: 1s;
+}
+.animate-immediately {
+	animation: highlight 0.75s ease-in-out;
 }
