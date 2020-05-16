@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 16.5.2020
+# 17.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -553,6 +553,9 @@ server <- function(input, output, session){
     desc <- rbind(desc, vect)
     row.names(desc)[nrow(desc)] <- "Total" #name the last row
     desc[int_cols] <- sapply(desc[int_cols], as.integer)
+    desc_out <<- desc # Result to global environment to enable download
+    
+    # Render descriptive statistics table
     desc
   }, 
   striped = TRUE,
@@ -560,6 +563,22 @@ server <- function(input, output, session){
   bordered = TRUE,
   rownames = TRUE,
   digits = 2)
+  
+  
+  #### 5.2.1 Download descriptive statistics ----
+  output$dl_descri <- downloadHandler(
+    filename = function() { 
+      paste("descriptives_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".csv",
+            sep = "")
+    },
+    content = function(file) {
+      write.csv(desc_out, file)
+    }
+  )
   
   
   #### 5.3 Histogram for parktime or walktime ----------------------------------
@@ -622,7 +641,7 @@ server <- function(input, output, session){
       
       # Build legend, override colors to get visible color for density. Also,
       # override linetype to get a solid line for density.
-      scale_color_manual(name = paste("Legend for\n", resp_col), 
+      scale_color_manual(name = paste("Legend for\n", resp_col, sep = ""), 
                          values = c(median = "blue", 
                                     mean = "red", 
                                     "kernel density\nestimate" = alpha("black", 0.4))) +
@@ -635,8 +654,38 @@ server <- function(input, output, session){
                geom = "text", 
                aes(label = ifelse(..count.. > 0, ..count.., "")), 
                vjust = -0.65)
+    
+    
+    # Prepare the downloadable histogram. "hist_out" is brought global environment 
+    # for download. Use larger fonts.
+    hist_out <- LabelBuilder(p, input$expl, input$checkGroup, input$subdivGroup)
+    hist_out <<- 
+      hist_out + 
+      theme(legend.title = element_text(size = 23),
+            legend.text = element_text(size = 22),
+            axis.text = element_text(size = 19),
+            axis.title = element_text(size = 22))
+    
+    # Render histogram
     p
   })
+  
+  
+  #### 5.3.1 Download histogram ----
+  output$dl_hist <- downloadHandler(
+    filename = function() { 
+      paste("hist_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            "binw", input$bin, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".png",
+            sep = "")
+    },
+    content = function(file) {
+      ggsave(plot = hist_out, file, height = 10, width = 26, dpi = 150)
+    }
+  )
   
   
   #### 5.4 Barplot -------------------------------------------------------------
@@ -692,8 +741,38 @@ server <- function(input, output, session){
     legendnames <- unique(inputdata[[barplotval]])
     plo <- InterpolateGgplotColors(plo, legendnames, 12, "Paired")
     
+    
+    # Prepare the downloadable barplot. "barplot_out" is brought global 
+    # environment for download. Use larger fonts.
+    
+    # Labeling inactive checkGroup values is not meaningful in the barplot
+    barplot_out <- LabelBuilder(plo, "", c(), input$subdivGroup)
+    barplot_out <<- 
+      barplot_out + 
+      theme(legend.title = element_text(size = 22),
+            legend.text = element_text(size = 21),
+            axis.text = element_text(size = 20),
+            axis.title = element_text(size = 22))
+    
+    # Render barplot
     plo
   })
+  
+  
+  #### 5.4.1 Download barplot ----
+  output$dl_barplot <- downloadHandler(
+    filename = function() { 
+      paste("barplot_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$expl, "-", input$barplot, "_",
+            format(Sys.time(), "%d-%m-%Y"),
+            ".png",
+            sep = "")
+    },
+    content = function(file) {
+      ggsave(plot = barplot_out, file, height = 10, width = 26, dpi = 150)
+    }
+  )
   
   
   #### 5.5 Boxplot -------------------------------------------------------------
@@ -725,8 +804,37 @@ server <- function(input, output, session){
       p <- p + theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1))
     }
     
+    
+    # Prepare the downloadable boxplot. "boxplot_out" is brought global environment 
+    # for download. Use larger fonts.
+    
+    # Labeling inactive checkGroup values is not meaningful in the boxplot
+    boxplot_out <- LabelBuilder(p, "", c(), input$subdivGroup)
+    boxplot_out <<- 
+      boxplot_out + 
+      theme(axis.text = element_text(size = 21),
+            axis.title = element_text(size = 23),
+            axis.text.x = element_text(size = 21))
+    
+    # Render boxplot
     p
   })
+  
+  
+  #### 5.5.1 Download boxplot ----
+  output$dl_boxplot <- downloadHandler(
+    filename = function() { 
+      paste("boxplot_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"),
+            ".png",
+            sep = "")
+    },
+    content = function(file) {
+      ggsave(plot = boxplot_out, file, height = 12, width = 26, dpi = 150)
+    }
+  )
   
   
   #### 5.6 Levene test ---------------------------------------------------------
@@ -742,6 +850,9 @@ server <- function(input, output, session){
     
     # Present "Df" as integer to prevent decimal places in app
     res["Df"] <- sapply(res["Df"], as.integer)
+    levene_out <<- res # Result to global environment to enable download
+    
+    # Render Levene test
     res
   }, 
   digits = 6,
@@ -749,6 +860,22 @@ server <- function(input, output, session){
   hover = TRUE,
   bordered = TRUE,
   rownames = TRUE)
+  
+  
+  #### 5.6.1 Download levene test table ----
+  output$dl_levene <- downloadHandler(
+    filename = function() { 
+      paste("levene_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".csv",
+            sep = "")
+    },
+    content = function(file) {
+      write.csv(levene_out, file)
+    }
+  )
   
   
   #### 5.7 One-way ANOVA -------------------------------------------------------
@@ -766,6 +893,9 @@ server <- function(input, output, session){
     anovasummary <- SigTableToShiny(anovasummary, FALSE)
     
     anovasummary["Df"] <- sapply(anovasummary["Df"], as.integer)
+    anova_out <<- anovasummary # Result to global environment to enable download
+    
+    # Render ANOVA
     anovasummary
   },
   digits = 6,
@@ -773,6 +903,22 @@ server <- function(input, output, session){
   hover = TRUE,
   bordered = TRUE,
   rownames = TRUE)
+  
+  
+  #### 5.7.1 Download One-way ANOVA table ----
+  output$dl_anova <- downloadHandler(
+    filename = function() { 
+      paste("oneway-anova_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".csv",
+            sep = "")
+    },
+    content = function(file) {
+      write.csv(anova_out, file)
+    }
+  )
   
   
   ### 5.8 Brown-Forsythe test --------------------------------------------------
@@ -790,8 +936,27 @@ server <- function(input, output, session){
     captured <- capture.output(onewaytests::bf.test(thisFormula, data = inputdata), 
                                file = NULL, 
                                append = TRUE)
+    brown_out <<- captured # Result to global environment to enable download
+    
+    # Render Brown-Forsythe
     cat(captured, sep = "\n")
   })
+  
+  
+  #### 5.8.1 Download Brown-Forsythe table ----
+  output$dl_brown <- downloadHandler(
+    filename = function() {
+      paste("brownf_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".txt",
+            sep = "")
+    },
+    content = function(file) {
+      cat(brown_out, file = file, sep = "\n")
+    }
+  )
   
   
   ### 5.9 Context map ----------------------------------------------------------
@@ -851,10 +1016,36 @@ server <- function(input, output, session){
             legend.text = element_text(size = 14),
             legend.position = "bottom")
     
+    
+    # Prepare the downloadable context map. Global context to enable the 
+    # download. Use larger fonts.
+    map_out <<- g2 + 
+      theme(text = element_text(size = 25),
+            legend.title = element_text(size = 17),
+            legend.text = element_text(size = 16),
+            axis.text = element_text(size = 14),
+            axis.title = element_text(size = 16))
+    
+    # Render context map
     ggiraph(code = print(g2), 
             width_svg = 16.7, 
-            height_svg = 14.7)
+            height_svg = 14.7, 
+            options = list(opts_sizing(rescale = FALSE)))
   })
+  
+  
+  #### 5.9.1 Download context map ----
+  output$dl_map <- downloadHandler(
+    filename = function() {
+      paste("context-map_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".png",
+            sep = "")
+    },
+    content = function(file) {
+      ggsave(plot = map_out, file, height = 16, width = 18, dpi = 150)
+    }
+  )
   
   
   ### 5.10 Interactive map -----------------------------------------------------
@@ -992,10 +1183,38 @@ server <- function(input, output, session){
                             size = 4))
     }
     
-    ggiraph(code = print(g), 
-            width_svg = 16.7, 
+    
+    # Prepare the downloadable interactive map. "interactive_out" is brought 
+    # to global environment for download. Use larger fonts.
+    interactive_out <- LabelBuilder(g, input$expl, input$checkGroup, 
+                                    input$subdivGroup)
+    interactive_out <<- 
+      interactive_out + 
+      theme(legend.title = element_text(size = 17),
+            legend.text = element_text(size = 16),
+            axis.text = element_text(size = 14),
+            axis.title = element_text(size = 16))
+    
+    # Render interactive map
+    ggiraph(code = print(g),
+            width_svg = 16.7,
             height_svg = 14.7)
   })
+  
+  
+  #### 5.10.1 Download interactive map ----
+  output$dl_interactive <- downloadHandler(
+    filename = function() { 
+      paste("interactive-map_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".png",
+            sep = "")
+    },
+    content = function(file) {
+      ggsave(plot = interactive_out, file, height = 16, width = 18, dpi = 150)
+    }
+  )
 }
 
 
@@ -1025,11 +1244,12 @@ ui <- shinyUI(fluidPage(
   includeScript(path = jspath),
   
   
+  
   ### 6.2 Sidebar layout -------------------------------------------------------
   titlePanel(NULL, windowTitle = "Sampo Vesanen MSc thesis research survey results"),
   sidebarLayout(
     sidebarPanel(id = "sidebar",
-      # &nbsp; is a non-breaking space. Will not be cut off at any situation
+      # &nbsp; is a non-breaking space
       HTML("<div id='contents'>"),
       HTML("<p id='linkheading_t'>Analysis</p>"),
       HTML("<a href='#descrilink'>1&nbsp;Descriptive statistics</a> &mdash;"),
@@ -1037,7 +1257,7 @@ ui <- shinyUI(fluidPage(
       HTML("<a href='#barplotlink'>3&nbsp;Barplot</a> &mdash;"),
       HTML("<a href='#boxplotlink'>4&nbsp;Boxplot</a> &mdash;"),
       HTML("<a href='#levenelink'>5&nbsp;Levene</a> &mdash;"),
-      HTML("<a href='#anovalink'>6&nbsp;ANOVA</a> &mdash;"),
+      HTML("<a href='#anovalink'>6&nbsp;One-way ANOVA</a> &mdash;"),
       HTML("<a href='#brownlink'>7&nbsp;Brown-Forsythe</a><br>"),
       HTML("<p id='linkheading_b'>Visualisation</p>"),
       HTML("<a href='#maplink'>8&nbsp;Context map</a> &mdash;"),
@@ -1047,59 +1267,59 @@ ui <- shinyUI(fluidPage(
       # Set allowed maximum for parktime and walktime. Default is 60 for both.
       HTML("<div id='stats-settings-link'><div id='contents'>"),
       sliderInput(
-       "parktime_max",
-       HTML("<p id='smalltext'>(These selections affect sections 1&mdash;7, 9)</p>",
-            "Set maximum allowed value for parktime (min)"),
-       min = min(thesisdata$parktime),
-       max = max(thesisdata$parktime),
-       value = 59,
-       step = 1),
+        "parktime_max",
+        HTML("<p id='smalltext'>(These selections affect sections 1&mdash;7, 9)</p>",
+             "Set maximum allowed value for parktime (min)"),
+        min = min(thesisdata$parktime),
+        max = max(thesisdata$parktime),
+        value = 59,
+        step = 1),
       
       sliderInput(
-       "walktime_max",
-       HTML("Set maximum allowed value for walktime (min)"), 
-       min = min(thesisdata$walktime),
-       max = max(thesisdata$walktime),
-       value = 59,
-       step = 1),
+        "walktime_max",
+        HTML("Set maximum allowed value for walktime (min)"), 
+        min = min(thesisdata$walktime),
+        max = max(thesisdata$walktime),
+        value = 59,
+        step = 1),
       
       actionButton(
-       "resetParkWalk", 
-       HTML("Revert values to default (59&nbsp;min)")),
+        "resetParkWalk", 
+        HTML("Revert values to default (59&nbsp;min)")),
       
       HTML("</div>"),
       
       # Select walktime or parktime
       HTML("<div id='contents'>"),
       selectInput(
-       "resp", 
-       HTML("<p id='smalltext'>(These selections affect sections 1&mdash;7, 9)</p>",
-            "Response (continuous)"),
-       names(thesisdata[continuous])),
+        "resp", 
+        HTML("<p id='smalltext'>(These selections affect sections 1&mdash;7, 9)</p>",
+             "Response (continuous)"),
+        names(thesisdata[continuous])),
       
       # likert, parkspot, timeofday, ua_forest, ykr_zone, subdiv
       selectInput(
-       "expl",
-       "Explanatory (ordinal)", 
-       names(thesisdata[ordinal])),
+        "expl",
+        "Explanatory (ordinal)", 
+        names(thesisdata[ordinal])),
       
       # These are changed with the observer function
       checkboxGroupInput(
-       "checkGroup",
-       "Select inactive groups in current explanatory variable",
-       choiceNames = c("Item A", "Item B", "Item C"),
-       choiceValues = c("a", "b", "c")),
+        "checkGroup",
+        "Select inactive groups in current explanatory variable",
+        choiceNames = c("Item A", "Item B", "Item C"),
+        choiceValues = c("a", "b", "c")),
       HTML("</div></div>"),
       
       # Allow user to access histogram binwidth
       HTML("<div id='hist-settings-link'><div id='contents'>"),
       sliderInput(
-       "bin",
-       HTML("Select binwidth for the current response variable",
-            "<a id='smalltext' href='#histlink'>(2 Histogram)</a>"), 
-       min = 1, 
-       max = 10, 
-       value = 2),
+        "bin",
+        HTML("Select binwidth for the current response variable",
+             "<a id='smalltext' href='#histlink'>(2 Histogram)</a>"), 
+        min = 1, 
+        max = 10, 
+        value = 2),
       HTML("</div></div>"),
       
       # Provide user possibility to see distribution of answers within the
@@ -1107,67 +1327,67 @@ ui <- shinyUI(fluidPage(
       # The values of this conditionalPanel are changed with the observer
       # function
       conditionalPanel(
-       condition = 
-         "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-       
-       HTML("<div id='barplot-settings-link'><div id='contents'>"),
-       selectInput(
-         "barplot", 
-         HTML("Y axis for Distribution of ordinal variables",
-              "<a id='smalltext' href='#barplotlink'>",
-              "(3 Distribution of ordinal variables)</a>"),
-         names(thesisdata[c("zipcode", "likert", "walktime")]),
-       ),
-       HTML("</div></div>")
+        condition = 
+          "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
+        
+        HTML("<div id='barplot-settings-link'><div id='contents'>"),
+        selectInput(
+          "barplot", 
+          HTML("Y axis for Distribution of ordinal variables",
+               "<a id='smalltext' href='#barplotlink'>",
+               "(3 Distribution of ordinal variables)</a>"),
+          names(thesisdata[c("zipcode", "likert", "walktime")]),
+        ),
+        HTML("</div></div>")
       ),
       
       # Select to inactivate subdivs. Overrides all options (except interactive 
       # map) 
       HTML("<div id='subdiv-settings-link'><div id='contents'>"),
       checkboxGroupInput(
-       "subdivGroup",
-       HTML("Select inactive subdivisions <p id='smalltext'>",
-            "(Affects sections 1&mdash;9. Please be aware that these selections", 
-            "override Explanatory (ordinal) variable 'subdiv')</p>"),
-       choiceNames = sort(as.character(unique(thesisdata$subdiv))),
-       choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
+        "subdivGroup",
+        HTML("Select inactive subdivisions <p id='smalltext'>",
+             "(Affects sections 1&mdash;9. Please be aware that these selections", 
+             "override Explanatory (ordinal) variable 'subdiv')</p>"),
+        choiceNames = sort(as.character(unique(thesisdata$subdiv))),
+        choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
       
       # Reset inactivations with this button
       actionButton(
-       "resetSubdivs", 
-       "Clear inactive subdivisions"),
+        "resetSubdivs", 
+        "Clear inactive subdivisions"),
       HTML("</div></div>"),
       
       # Interactive map jenks breaks options
       HTML("<div id='intmap-settings-link'><div id='contents'>"),
       checkboxGroupInput(
-       "kunta",
-       HTML("Select extent for the interactive map",
-            "<a id='smalltext' href='#intmaplink'>(9 Interactive map)</a>"),
-       choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
-       choiceValues = c("091", "092", "049", "235")),
+        "kunta",
+        HTML("Select extent for the interactive map",
+             "<a id='smalltext' href='#intmaplink'>(9 Interactive map)</a>"),
+        choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
+        choiceValues = c("091", "092", "049", "235")),
       
       selectInput(
-       "karttacol",
-       HTML("Select Jenks breaks parameter for the interactive map"),
-       c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
-         "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
+        "karttacol",
+        HTML("Select Jenks breaks parameter for the interactive map"),
+        c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
+          "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
       
       # Switch for interactive map labels
       HTML("<label class='control-label' for='show_int_labels'>Show labels</label>"),
       shinyWidgets::switchInput(
-       inputId = "show_int_labels", 
-       value = TRUE),
+        inputId = "show_int_labels", 
+        value = TRUE),
       
       sliderInput(
-       "jenks_n",
-       "Select the amount of classes",
-       min = 2, 
-       max = 8, 
-       value = 5),
+        "jenks_n",
+        "Select the amount of classes",
+        min = 2, 
+        max = 8, 
+        value = 5),
       
       HTML("</div></div>"),
-      HTML("<p id='version-info'>Analysis app version 16.5.2020</p>"),
+      HTML("<p id='version-info'>Analysis app version 17.5.2020</p>"),
       
       width = 3
     ),
@@ -1188,6 +1408,8 @@ ui <- shinyUI(fluidPage(
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('descri','descrilink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_descri",
+                   label = HTML("<i class='icon file' title='Download this table as csv'></i>")),
       HTML("</h3>"),
       tableOutput("descri"),
       HTML("</div>"),
@@ -1200,6 +1422,8 @@ ui <- shinyUI(fluidPage(
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('hist','histlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_hist",
+                   label = HTML("<i class='icon file' title='Download this plot as png'></i>")),
       HTML("</h3>"),
       plotOutput("hist"),
       HTML("</div>"),
@@ -1212,6 +1436,8 @@ ui <- shinyUI(fluidPage(
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('barplot_wrap','barplotlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_barplot",
+                   label = HTML("<i class='icon file' title='Download this plot as png'></i>")),
       HTML("</h3>"),
       HTML("<div id='barplot_wrap'>"),
       HTML("<p>This plot is active when <tt>likert</tt>, <tt>parkspot</tt>, or", 
@@ -1232,6 +1458,8 @@ ui <- shinyUI(fluidPage(
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('boxplot','boxplotlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_boxplot",
+                   label = HTML("<i class='icon file' title='Download this plot as png'></i>")),
       HTML("</h3>"),
       plotOutput("boxplot", height = "500px"),
       HTML("</div>"),
@@ -1243,6 +1471,8 @@ ui <- shinyUI(fluidPage(
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('levene_wrap','levenelink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_levene",
+                   label = HTML("<i class='icon file' title='Download this table as csv'></i>")),
       HTML("</h3>"),
       HTML("<div id='levene_wrap'>"),
       p("Look for p-value > 0.05 (0.05 '.' 0.1 ' ' 1) (variance across groups",
@@ -1257,10 +1487,12 @@ ui <- shinyUI(fluidPage(
       
       # ANOVA
       HTML("<div id='anovalink'>"),
-      HTML("<h3>6 Analysis of variance (ANOVA)&ensp;",
+      HTML("<h3>6 One-way analysis of variance (One-way ANOVA)&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('anova_wrap','anovalink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_anova",
+                   label = HTML("<i class='icon file' title='Download this table as csv'></i>")),
       HTML("</h3>"),
       HTML("<div id='anova_wrap'>"),
       tableOutput("anova"),
@@ -1274,6 +1506,8 @@ ui <- shinyUI(fluidPage(
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('brown_wrap', 'brownlink')\"><i class='icon eyeslash' title='Hide element'></i></button></button>"),
+      downloadLink("dl_brown",
+                   label = HTML("<i class='icon file' title='Download this output as txt'></i>")),
       HTML("</h3>"),
       HTML("<div id='brown_wrap'>"),
       p("Look for a statistically significant difference between the selected", 
@@ -1291,6 +1525,8 @@ ui <- shinyUI(fluidPage(
       HTML("<h3>8 Active subdivisions&ensp;",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('map', 'maplink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_map",
+                   label = HTML("<i class='icon file' title='Download this figure as png'></i>")),
       HTML("</h3>"),
       ggiraphOutput("map"),
       HTML("</div>"),
@@ -1303,6 +1539,8 @@ ui <- shinyUI(fluidPage(
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('interactive', 'intmaplink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
+      downloadLink("dl_interactive",
+                   label = HTML("<i class='icon file' title='Download this figure as png'></i>")),
       HTML("</h3>"),
       HTML("<div class='noselect'>"),
       ggiraphOutput("interactive"),

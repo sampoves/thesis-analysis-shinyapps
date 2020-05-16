@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 11.5.2020
+# 17.5.2020
 
 # Initialise
 library(onewaytests)
@@ -15,6 +15,73 @@ library(rlang)
 library(classInt)
 library(ggplot2)
 library(RColorBrewer)
+
+
+
+
+LabelBuilder <- function(plot_obj, expl, checkGroup, subdivGroup) {
+  
+  # Download helper function.
+  
+  if(length(checkGroup) == 0 & length(subdivGroup) == 0) {
+    
+    # Return inputted ggplot object if there are no values in checkGroup or
+    # subdivGroup
+    result_plot <- plot_obj
+    
+  } else {
+    # Add conditional disclaimer about excluded groups and/or subdivisions.
+    # Make use of Every8th() to divide long vectors into many rows
+    if(length(checkGroup) > 0) {
+      checklab <- paste("- Groups excluded from the explanatory variable ", expl, ":\n", 
+                        Every8th(c(checkGroup)), sep = "")
+    }
+    if(length(subdivGroup) > 0) {
+      subdivlab <- paste("- Subdivisions excluded:\n", 
+                         Every8th(c(subdivGroup)), sep = "")
+    } 
+    
+    # Build caption label
+    if (!exists("checklab") & exists("subdivlab")) {
+      full_lab <- subdivlab
+    } else if (exists("checklab") & !exists("subdivlab")) {
+      full_lab <- checklab
+    } else {
+      full_lab <- paste0(checklab, "\n", subdivlab)
+    }
+    
+    # Make additions to ggplot object
+    result_plot <- plot_obj + 
+      labs(caption = full_lab) +
+      theme(plot.caption = element_text(size = 15, hjust = 0, face = "italic"),
+            plot.caption.position =  "plot")
+  }
+  
+  return(result_plot)
+}
+
+
+
+Every8th <- function(input) {
+  
+  # Download helper function.
+  
+  # This function splits input$checkGroup and input$subdivGroup into bits of
+  # eight separated by a newline. For the use with downloadable versions of
+  # plots
+  
+  # Prevent situation where an empty input is fed to split()
+  if(length(input) < 1) {
+    return("")
+    
+  } else {
+    result <- split(input, ceiling(seq_along(input) / 8))
+    result <- sapply(result, function(x) paste0(x, collapse = ", "))
+    result <- capture.output(cat(paste(result, collapse = "\n")))
+    result <- paste0(result, collapse = "\n")
+  }
+  return(result)
+}
 
 
 
