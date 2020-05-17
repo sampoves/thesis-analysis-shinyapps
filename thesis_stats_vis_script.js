@@ -45,9 +45,6 @@ function show_hide_sb() {
 $(function() {
 	$('.well').after("<div class='hidesidebar'><button id='showhidebutton' onclick='show_hide_sb()'><i class='icon eyeslash' title='Hide sidebar'></i></button></div>");
 	
-	// Disable mobile keyboard on dropdown menus
-	$('.selectize-input input').attr('readonly','readonly');
-	
 	// Make ggiraph outputs untouchable
 	$("#hist").addClass('noselect');
 	$("#barplot_ord").addClass('noselect');
