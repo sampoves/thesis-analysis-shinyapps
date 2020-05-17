@@ -45,6 +45,9 @@ function show_hide_sb() {
 $(function() {
 	$('.well').after("<div class='hidesidebar'><button id='showhidebutton' onclick='show_hide_sb()'><i class='icon eyeslash' title='Hide sidebar'></i></button></div>");
 	
+	// Disable mobile keyboard on dropdown menus
+	$('.selectize-input input').attr('readonly','readonly');
+	
 	// Make ggiraph outputs untouchable
 	$("#hist").addClass('noselect');
 	$("#barplot_ord").addClass('noselect');
@@ -60,6 +63,9 @@ $(document).one('shiny:idle', function(event) {
 	var sig = "<p id='signif'>Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</p>";
 	
 	setTimeout(function() {
+		// Disable mobile keyboard on dropdown menus
+		$('.selectize-input input').attr('readonly','readonly');
+		
 		$('#levene table').after(sig);
 		$('#anova table').after(sig);
 	}, 8000);
