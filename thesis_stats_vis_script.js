@@ -16,6 +16,48 @@ function show_hide(shrink_me, parent_div) {
 	}
 };
 
+// Specified function to hide/show sidebar
+function show_hide_sb() {
+	var elem_to_hide = document.getElementById('sidebar');
+	var showhidebutton = document.getElementById('showhidebutton');
+
+	if(elem_to_hide.style.display === 'none') {
+		elem_to_hide.style.display = 'block';
+		$(showhidebutton).find('i.icon.eye').toggleClass('eye eyeslash');
+		$(showhidebutton).find('i.icon.eyeslash')[0].setAttribute('title', 'Hide sidebar');
+	} else {
+		elem_to_hide.style.display = 'none';
+		$(showhidebutton).find('i.icon.eyeslash').toggleClass('eyeslash eye');
+		$(showhidebutton).find('i.icon.eye')[0].setAttribute('title', 'Show sidebar');
+	}
+};
+
+// Insert sidebar hide/show button to col-sm-3, the div that contains the sidebar. Add
+// the button after the actual sidebar div. The button appears on the top right corner
+// of the sidebar.
+$(function() {
+	$('.well').after("<div class='hidesidebar'><button id='showhidebutton' onclick='show_hide_sb()'><i class='icon eyeslash' title='Hide sidebar'></i></button></div>");
+	
+	// Make ggiraph outputs untouchable
+	$("#hist").addClass('noselect');
+	$("#barplot_ord").addClass('noselect');
+	$("#boxplot").addClass('noselect');
+	$("#map").addClass('noselect');
+	$("#interactive").addClass('noselect');
+});
+
+// Insert significance element right after table element so that overflow-x: auto;
+// does not hide the text. Again with the hacky setTimeout() approach. Could not figure
+// a better way in this timeframe.
+$(document).one('shiny:idle', function(event) {
+	var sig = "<p id='signif'>Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</p>";
+	
+	setTimeout(function() {
+		$('#levene table').after(sig);
+		$('#anova table').after(sig);
+	}, 8000);
+});
+
 // This jQuery function listens to anchor link clicking. With this function I aimed to
 // make repeated clicking possible, which was not with :target selectors I used earlier.
 // In short, this detects with the amount of clicks if we fire a delayed highlight or

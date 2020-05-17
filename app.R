@@ -582,7 +582,7 @@ server <- function(input, output, session){
   
   
   #### 5.3 Histogram for parktime or walktime ----------------------------------
-  output$hist <- renderPlot({
+  output$hist <- renderggiraph({
     
     resp_col <- input$resp
     expl_col <- input$expl
@@ -593,6 +593,7 @@ server <- function(input, output, session){
     
     p <- ggplot(inputdata, aes(x = !!sym(resp_col))) + 
       geom_histogram(color = "black", fill = "grey", binwidth = binwidth) +
+      xlab(paste(resp_col, "(min)")) +
       
       # Vertical lines for mean and median, respectively. Also display exact
       # values with annotate_custom() and textGrobs.
@@ -603,8 +604,8 @@ server <- function(input, output, session){
       annotation_custom(
         grob = grid::textGrob(label = round(mean(resp_vect), 2), 
                               hjust = -0.3,
-                              vjust = 1.2, 
-                              gp = grid::gpar(cex = 1, col = "red")),
+                              vjust = 1.25, 
+                              gp = grid::gpar(cex = 1.2, col = "red")),
         ymin = 0,
         ymax = 0,
         xmin = round(mean(resp_vect), 2),
@@ -617,8 +618,8 @@ server <- function(input, output, session){
       annotation_custom(
         grob = grid::textGrob(label = round(median(resp_vect), 2), 
                               hjust = 2,
-                              vjust = 1.2, 
-                              gp = grid::gpar(cex = 1, col = "blue")),
+                              vjust = 1.25, 
+                              gp = grid::gpar(cex = 1.2, col = "blue")),
         ymin = 0,
         ymax = 0,
         xmin = round(median(resp_vect), 2),
@@ -633,11 +634,12 @@ server <- function(input, output, session){
                    show.legend = FALSE,
                    adjust = binwidth) +
       
-      theme(legend.title = element_text(size = 15),
-            legend.text = element_text(size = 14),
-            legend.spacing.y = unit(0.2, "cm"),
-            axis.text = element_text(size = 12),
-            axis.title = element_text(size = 14)) +
+      theme(legend.title = element_text(size = 16),
+            legend.text = element_text(size = 15),
+            legend.spacing.y = unit(0.3, "cm"),
+            axis.text = element_text(size = 13),
+            axis.title = element_text(size = 15),
+            text = element_text(size = 13)) +
       
       # Build legend, override colors to get visible color for density. Also,
       # override linetype to get a solid line for density.
@@ -667,7 +669,9 @@ server <- function(input, output, session){
             axis.title = element_text(size = 22))
     
     # Render histogram
-    p
+    ggiraph(code = print(p),
+            width_svg = 16.7,
+            height_svg = 6)
   })
   
   
@@ -689,7 +693,7 @@ server <- function(input, output, session){
   
   
   #### 5.4 Barplot -------------------------------------------------------------
-  output$barplot <- renderPlot({
+  output$barplot_ord <- renderggiraph({
     
     # See distribution of ordinal variables through a grouped bar plot
     expl_col <- input$expl
@@ -731,10 +735,10 @@ server <- function(input, output, session){
       ylab(yax) +
       labs(fill = barplotval) +
       theme(legend.position = "bottom",
-            legend.title = element_text(size = 15),
-            legend.text = element_text(size = 14),
-            axis.text = element_text(size = 12),
-            axis.title = element_text(size = 14))
+            legend.title = element_text(size = 16),
+            legend.text = element_text(size = 15),
+            axis.text = element_text(size = 13),
+            axis.title = element_text(size = 15))
     
     # Use RColorBrewer color scale. Paired has 12 set colors, interpolate if
     # there are more values to map than that.
@@ -755,7 +759,9 @@ server <- function(input, output, session){
             axis.title = element_text(size = 22))
     
     # Render barplot
-    plo
+    ggiraph(code = print(plo),
+            width_svg = 16.7,
+            height_svg = 6)
   })
   
   
@@ -776,7 +782,7 @@ server <- function(input, output, session){
   
   
   #### 5.5 Boxplot -------------------------------------------------------------
-  output$boxplot <- renderPlot({
+  output$boxplot <- renderggiraph({
     
     expl_col <- input$expl
     resp_col <- input$resp
@@ -791,8 +797,8 @@ server <- function(input, output, session){
     p <- ggplot(inputdata, aes_string(x = expl_col, y = resp_col, fill = expl_col)) + 
       geom_boxplot() + 
       ylab(paste(resp_col, "(min)")) +
-      theme(axis.text = element_text(size = 12),
-            axis.title = element_text(size = 14),
+      theme(axis.text = element_text(size = 13),
+            axis.title = element_text(size = 15),
             legend.position = "none")
     
     # Use RColorBrewer color scale. Set3 has 12 set colors, interpolate if
@@ -801,7 +807,7 @@ server <- function(input, output, session){
     
     # Diagonal labels if more values to map than five
     if(length(legendnames) > 5) {
-      p <- p + theme(axis.text.x = element_text(size = 12, angle = 45, hjust = 1))
+      p <- p + theme(axis.text.x = element_text(size = 13, angle = 45, hjust = 1))
     }
     
     
@@ -817,7 +823,9 @@ server <- function(input, output, session){
             axis.text.x = element_text(size = 21))
     
     # Render boxplot
-    p
+    ggiraph(code = print(p),
+            width_svg = 16.7,
+            height_svg = 7)
   })
   
   
@@ -1170,7 +1178,7 @@ server <- function(input, output, session){
       # Legend settings
       theme(legend.title = element_text(size = 15),
             legend.text = element_text(size = 14),
-            plot.caption = element_text(size = 13, hjust = 0.5))
+            plot.caption = element_text(size = 13, hjust = 0.5, face = "italic"))
     
     
     # Label switch boolean test
@@ -1423,9 +1431,9 @@ ui <- shinyUI(fluidPage(
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('hist','histlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_hist",
-                   label = HTML("<i class='icon file' title='Download this plot as png'></i>")),
+                   label = HTML("<i class='icon file' title='Download hi-res version of this plot (png)'></i>")),
       HTML("</h3>"),
-      plotOutput("hist"),
+      ggiraphOutput("hist", height = "400px"),
       HTML("</div>"),
       hr(),
       
@@ -1437,7 +1445,7 @@ ui <- shinyUI(fluidPage(
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('barplot_wrap','barplotlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_barplot",
-                   label = HTML("<i class='icon file' title='Download this plot as png'></i>")),
+                   label = HTML("<i class='icon file' title='Download hi-res version of this plot (png)'></i>")),
       HTML("</h3>"),
       HTML("<div id='barplot_wrap'>"),
       HTML("<p>This plot is active when <tt>likert</tt>, <tt>parkspot</tt>, or", 
@@ -1446,7 +1454,7 @@ ui <- shinyUI(fluidPage(
       conditionalPanel(
         condition = 
           "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-        plotOutput("barplot"),
+        ggiraphOutput("barplot_ord", height = "400px"),
       ),
       HTML("</div>"),
       hr(),
@@ -1459,13 +1467,13 @@ ui <- shinyUI(fluidPage(
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('boxplot','boxplotlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_boxplot",
-                   label = HTML("<i class='icon file' title='Download this plot as png'></i>")),
+                   label = HTML("<i class='icon file' title='Download hi-res version of this plot (png)'></i>")),
       HTML("</h3>"),
-      plotOutput("boxplot", height = "500px"),
+      ggiraphOutput("boxplot", height = "500px"),
       HTML("</div>"),
       hr(),
       
-      # Levene's test
+      # Levene's test. Significance legend is inserted with JavaScript
       HTML("<div id='levenelink'>"),
       HTML("<h3>5 Test for homogeneity of variances (Levene's test)&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
@@ -1481,7 +1489,6 @@ ui <- shinyUI(fluidPage(
         "is a difference between the variances in the population. If p < 0.05,",
         "employ Brown-Forsythe test."),
       tableOutput("levene"),
-      HTML("<p id='signif'>Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</p>"),
       HTML("</div></div>"),
       hr(),
       
@@ -1496,7 +1503,6 @@ ui <- shinyUI(fluidPage(
       HTML("</h3>"),
       HTML("<div id='anova_wrap'>"),
       tableOutput("anova"),
-      HTML("<p id='signif'>Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</p>"),
       HTML("</div></div>"),
       hr(),
       
@@ -1526,7 +1532,7 @@ ui <- shinyUI(fluidPage(
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('map', 'maplink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_map",
-                   label = HTML("<i class='icon file' title='Download this figure as png'></i>")),
+                   label = HTML("<i class='icon file' title='Download hi-res version of this figure (png)'></i>")),
       HTML("</h3>"),
       ggiraphOutput("map"),
       HTML("</div>"),
@@ -1540,11 +1546,10 @@ ui <- shinyUI(fluidPage(
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('interactive', 'intmaplink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_interactive",
-                   label = HTML("<i class='icon file' title='Download this figure as png'></i>")),
+                   label = HTML("<i class='icon file' title='Download hi-res version of this figure (png)'></i>")),
       HTML("</h3>"),
-      HTML("<div class='noselect'>"),
       ggiraphOutput("interactive"),
-      HTML("</div></div>"),
+      HTML("</div>"),
       hr(),
       
       # Data providers
