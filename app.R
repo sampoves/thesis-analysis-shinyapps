@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 21.5.2020
+# 22.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -728,9 +728,10 @@ server <- function(input, output, session){
                             fill = get(barplotval))) +
       
       # Setting width and position_dodge adds space between bars
-      geom_bar(aes(y = stat(count)),
-               width = 0.8,
-               position = position_dodge(width = 0.9)) +
+      geom_bar_interactive(aes(y = stat(count),
+                               tooltip = paste(..count..)),
+                           width = 0.8,
+                           position = position_dodge(width = 0.9)) +
       
       scale_y_continuous(breaks = seq(0, maximum, by = tick_interval),
                          expand = expansion(mult = c(0, .1))) +
@@ -794,11 +795,30 @@ server <- function(input, output, session){
     # Listen to user choices
     inputdata <- currentdata()
     legendnames <- levels(unique(inputdata[[expl_col]]))
+    inputdata <- CalcBoxplotTooltip(inputdata, resp_col, expl_col)
+    
+    tooltip_content <- paste0("<div style='font-size: 12px;'>",
+                              "<div>Max = %s</div>",
+                              "<hr style='margin-top:2px; margin-bottom:2px;'>",
+                              "<b>Interquartile<br/>Range (IQR)</b><br/>",
+                              "<div style='padding-top: 3px;'>Q3 = %s<br/>",
+                              "Med = %s<br/>",
+                              "Q1 = %s</div>",
+                              "<hr style='margin-top:2px; margin-bottom:2px;'>",
+                              "<div style='padding-top: 3px;'>Min = %s</div>",
+                              "</div")
     
     # ggplot2 plotting. Rotate labels if enough classes. Use scale_fill_hue()
     # to distinguish boxplot colors from barplot colors.
-    p <- ggplot(inputdata, aes_string(x = expl_col, y = resp_col, fill = expl_col)) + 
-      geom_boxplot() + 
+    p <- ggplot(inputdata, aes_string(x = expl_col, 
+                                      y = resp_col, 
+                                      fill = expl_col)) + 
+      geom_boxplot_interactive(aes(tooltip = sprintf(tooltip_content,
+                                                     tooltip_max,
+                                                     tooltip_q3, 
+                                                     tooltip_mdn,
+                                                     tooltip_q1,
+                                                     tooltip_min))) + 
       ylab(paste(resp_col, "(min)")) +
       theme(axis.text = element_text(size = 13),
             axis.title = element_text(size = 15),
@@ -1466,7 +1486,7 @@ ui <- shinyUI(fluidPage(
        value = 5),
       
       HTML("</div></div>"),
-      HTML("<p id='version-info'>Analysis app version 21.5.2020</p>"),
+      HTML("<p id='version-info'>Analysis app version 22.5.2020</p>"),
       
       width = 3
     ),
