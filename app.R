@@ -120,7 +120,7 @@ thesisdata <- read.csv(file = datapath,
 
 
 
-#### 3 Context map for ShinyApp ------------------------------------------------
+#### 3 Prepare layers ----------------------------------------------------------
 
 #### 3.1 Subdivisions ----------------------------------------------------------
 
@@ -160,36 +160,9 @@ levels(suuralue_f$Name) <- c("Vantaa Aviapolis", "Helsinki Southern",
 thesisdata$subdiv <- factor(thesisdata$subdiv, levels = sort(levels(thesisdata$subdiv)))
 suuralue_f$Name <- factor(suuralue_f$Name, levels = sort(levels(suuralue_f$Name)))
 
-# Set color gradients for municipalities. Kauniainen will be a single color set 
-# below. These color gradients may be confusing. Investigate better colouring
-# in the future
-c_esp <- brewer.pal(7, "YlOrRd")
-c_hel <- brewer.pal(8, "PuBu")
-c_van <- brewer.pal(7, "BuGn")
-
-# In the next phase, each color has to be repeated as many times as they show
-# up in suuralue_f. Find out how many.
-amounts <- unname(table(suuralue_f$Name))
-
-# Assign hex codes to the color column using the order of subdivisions and 
-# amount of rows per subdivision. First reorder dataframe by subdivision
+# Reorder dataframe by subdivision
 suuralue_f <- suuralue_f[order(suuralue_f$Name), ]
-suuralue_f$color <- c(rep(c_esp[1], amounts[1]), rep(c_esp[2], amounts[2]), 
-                      rep(c_esp[3], amounts[3]), rep(c_esp[4], amounts[4]), 
-                      rep(c_esp[5], amounts[5]), rep(c_esp[6], amounts[6]), 
-                      rep(c_esp[7], amounts[7]), rep(c_hel[1], amounts[8]), 
-                      rep(c_hel[2], amounts[9]), rep(c_hel[3], amounts[10]),
-                      rep(c_hel[4], amounts[11]), rep(c_hel[5], amounts[12]),
-                      rep(c_hel[6], amounts[13]), rep(c_hel[7], amounts[14]),
-                      rep(c_hel[8], amounts[15]), rep("#98817B", amounts[16]),
-                      rep(c_van[1], amounts[17]), rep(c_van[2], amounts[18]),
-                      rep(c_van[3], amounts[19]), rep(c_van[4], amounts[20]),
-                      rep(c_van[5], amounts[21]), rep(c_van[6], amounts[22]),
-                      rep(c_van[7], amounts[23]))
 
-# Colors to factors and reorder subdivision names to facilitate ggplot
-suuralue_f <- suuralue_f %>% 
-  dplyr::mutate(color = as.factor(color)) # to factor
 
 
 #### 3.2 Municipality borders --------------------------------------------------
@@ -212,12 +185,12 @@ muns_clipped_f <- merge(ggplot2::fortify(muns_clipped),
 
 #### 3.3 Annotation ------------------------------------------------------------
 
-# Annotate municipalities for ggplot2
+# Annotate municipalities and subdivisions in ggplot2
 muns_cntr <- GetCentroids(muns_clipped_f, "nimi", "nimi")
 subdiv_cntr <- GetCentroids(suuralue_f, "Name", "Name")
 
 # Manually set better location for the annotation of Helsinki
-muns_cntr[2, 2] <- muns_cntr[2, 2] + 0.02
+muns_cntr[2, 2] <- muns_cntr[2, 2] + 2000
 muns_cntr$label <- c("Espoo", "Helsinki", "Kauniainen", "Vantaa")
 
 # name labels here so that all the reordering doesn't mix up stuff
@@ -235,7 +208,6 @@ subdiv_cntr[2, "lat"] <- subdiv_cntr[14, "lat"]
 subdiv_cntr[2, "long"] <- subdiv_cntr[1, "long"]
 subdiv_cntr[13, "lat"] <- subdiv_cntr[14, "lat"]
 subdiv_cntr[13, "long"] <- subdiv_cntr[21, "long"]
-subdiv_cntr[16, "label"] <- ""
 
 
 
@@ -720,14 +692,19 @@ server <- function(input, output, session){
       tick_interval <- 200
     }
     
+    tooltip_content <- paste0("<div id='app-tooltip'>",
+                              "<div>n=%s</div></div>")
+    
     plo <- 
       ggplot(inputdata, aes(x = get(expl_col), 
                             y = factor(get(barplotval)), 
                             fill = get(barplotval))) +
       
-      # Setting width and position_dodge adds space between bars
+      # Setting width and position_dodge adds space between bars. Add a simple
+      # tooltip.
       geom_bar_interactive(aes(y = stat(count),
-                               tooltip = paste(..count..)),
+                               tooltip = sprintf(tooltip_content,
+                                                 ..count..)),
                            width = 0.8,
                            position = position_dodge(width = 0.9)) +
       
@@ -983,103 +960,12 @@ server <- function(input, output, session){
   )
   
   
-  ### 5.9 Context map ----------------------------------------------------------
-  output$map <- renderggiraph({
-    
-    # Count active subdivs
-    active_subdivs <- length(unique(thesisdata$subdiv)) - length(input$subdivGroup)
-    
-    g2 <- ggplot() +
-      # Background grey subdivs appear when inactive subdivs present
-      geom_polygon(
-        data = suuralue_f,
-        aes(long, lat, group = group, fill = "#3d3d3d"),
-        colour = NA) +
-      
-      # Subdivisions proper
-      geom_polygon_interactive(
-        data = suuralue_f[!suuralue_f$Name %in% c(input$subdivGroup), ], 
-        size = 0.2,
-        aes(long, lat, group = group, fill = color),
-        colour = "grey") +
-      
-      # Municipality borders
-      geom_polygon(
-        data = muns_clipped_f,
-        aes(long, lat, group = group),
-        fill = NA,
-        color = "black",
-        size = 0.4) +
-      
-      coord_equal(ratio = 1, ylim = c(6662000, 6698000)) +
-      
-      # Legend contents
-      scale_fill_identity(paste0("Currently active\nsubdivisions\n(", 
-                                 active_subdivs, " out of 23)"), 
-                          labels = suuralue_f$Name, 
-                          breaks = suuralue_f$color, 
-                          guide = "legend") +
-      
-      # Annotations. subdiv_cntr is subdiv labels, muns_cntr is municipality
-      # labels.
-      with(muns_cntr, 
-           annotate(geom = "text", 
-                    x = long, 
-                    y = lat, 
-                    label = label, 
-                    size = 5,
-                    fontface = 2)) +
-      
-      with(subdiv_cntr[!subdiv_cntr$label %in% gsub(".* ", "", c(input$subdivGroup)), ], 
-           annotate(geom = "text", 
-                    x = long, 
-                    y = lat, 
-                    label = label, 
-                    size = 4)) +
-      
-      # Tight layout and legend properties
-      theme(plot.margin = grid::unit(c(0, 0, 0, 0), "mm"),
-            legend.title = element_text(size = 15),
-            legend.text = element_text(size = 14),
-            legend.position = "bottom")
-    
-    
-    # Prepare the downloadable context map. Global context to enable the 
-    # download. Use larger fonts.
-    map_out <<- g2 + 
-      theme(text = element_text(size = 25),
-            legend.title = element_text(size = 17),
-            legend.text = element_text(size = 16),
-            axis.text = element_text(size = 14),
-            axis.title = element_text(size = 16))
-    
-    # Render context map
-    ggiraph(code = print(g2), 
-            width_svg = 16.7, 
-            height_svg = 14.7, 
-            options = list(opts_sizing(rescale = FALSE)))
-  })
-  
-  
-  #### 5.9.1 Download context map ----
-  output$dl_map <- downloadHandler(
-    filename = paste("context-map_",
-                     format(Sys.time(), "%d-%m-%Y"), 
-                     ".png",
-                     sep = ""),
-    
-    content = function(file) {
-      ggsave(plot = map_out, file, height = 16, width = 18, dpi = 150)
-    }
-  )
-  
-  
-  ### 5.10 Interactive map -----------------------------------------------------
+  ### 5.9 Interactive map -----------------------------------------------------
   output$interactive <- renderggiraph({
     
     # Use reactive data_f and postal
     # Only select municipalities selected by user. Do the same for "postal",
-    # we fetch jenks breaks from there.
+    # we fetch Jenks breaks from there.
     inputdata <- current_data_f()
     inputdata <- inputdata[!inputdata$kunta %in% c(input$kunta), ]
     
@@ -1124,7 +1010,7 @@ server <- function(input, output, session){
       legendname <- "Answer count"
     }
     
-    # Create jenks breaks columns here so that user gets the control of Jenks
+    # Create Jenks breaks columns here so that user gets the control of Jenks
     # breaks classes. classInt::classIntervals() together with cut() creates
     # non-overlapping intervals, which are denoted as follows, for example:
     # Levels: (183,271] (102,183] (56,102] (24,56] [1,24]
@@ -1135,28 +1021,32 @@ server <- function(input, output, session){
     # Get centroids for labelling polygons
     current_centr <- GetCentroids(inputdata, "zipcode", datacol)
     
-    # Finetune locations for certain labels
-    current_centr[15, 1] <- current_centr[15, 1] + 500 # Taka-Toolo
-    current_centr[83, 1] <- current_centr[83, 1] - 850 # Etela-Vuosaari
-    current_centr[107, 2] <- current_centr[107, 2] - 300 # Hamevaara 
-    current_centr[116, 2] <- current_centr[116, 2] - 500 # Vantaanpuisto
-    current_centr[144, 1] <- current_centr[144, 1] + 2400 # Suvisaaristo
-    current_centr[162, 1] <- current_centr[162, 1] + 1000 # Nupuri-Nuuksio
+    # Finetune locations for certain labels. GetCentroids saves the second
+    # parameter as rownames. We can use that to reliably find correct rows
+    # to finetune.
+    current_centr["00250", 1] <- current_centr["00250", 1] + 500 # Taka-Toolo
+    current_centr["00980", 1] <- current_centr["00980", 1] - 850 # Etela-Vuosaari
+    current_centr["01640", 2] <- current_centr["01640", 2] - 300 # Hamevaara 
+    current_centr["01730", 2] <- current_centr["01730", 2] - 500 # Vantaanpuisto
+    current_centr["02380", 1] <- current_centr["02380", 1] + 2400 # Suvisaaristo
+    current_centr["02820", 1] <- current_centr["02820", 1] + 1000 # Nupuri-Nuuksio
     
     # Format map labels. Remove [, ], (, and ). Also add list dash
     labels <- gsub("(])|(\\()|(\\[)", "", levels(inputdata[, input$karttacol]))
     labels <- gsub(",", " \U2012 ", labels)
     
     tooltip_content <- paste0(
+      "<div id='app-tooltip'>",
       "<div>%s, %s<br/>",
       "Answer count: <b>%s</b></div>",
-      "<hr style='margin-top:2px; margin-bottom:2px;'>",
-      "<div style='padding-top: 3px;'>Parktime, mean: %s</br>",
+      "<hr id='tooltip-hr'>",
+      "<div id='tooltip-div'>Parktime, mean: %s</br>",
       "Parktime, median: %s</div>",
-      "<div style='padding-top: 3px;'>Walktime, mean: %s</br>",
+      "<div id='tooltip-div'>Walktime, mean: %s</br>",
       "Walktime, median: %s</div>",
-      "<div style='padding-top: 3px;'>Forest (%%): %s</div>",
-      "<div style='padding-top: 3px; line-height: 1.2;'>Largest YKR<br/>zone (%%): %s</div>")
+      "<div id='tooltip-div'>Forest (%%): %s</div>",
+      "<div style='padding-top: 3px; line-height: 1.2;'>Largest YKR<br/>zone (%%): %s</div>",
+      "</div>")
     
     g <- ggplot(inputdata) +
       geom_polygon_interactive(
@@ -1168,8 +1058,8 @@ server <- function(input, output, session){
                    group = "group", 
                    fill = input$karttacol,
                    tooltip = substitute(sprintf(tooltip_content,
-                      id, nimi, answer_count, parktime_mean, parktime_median, 
-                      walktime_mean, walktime_median, ua_forest, largest_ykr)))) +
+                                                id, nimi, answer_count, parktime_mean, parktime_median, 
+                                                walktime_mean, walktime_median, ua_forest, largest_ykr)))) +
       
       # Jenks classes colouring and labels
       scale_fill_brewer(palette = brewerpal,
@@ -1177,10 +1067,10 @@ server <- function(input, output, session){
                         name = legendname,
                         labels = labels,
                         na.value = "#ebebeb")
-      
+    
     # Plot municipality and/or subdivision borders on the interactive map
     if(input$show_muns == TRUE) {
-      # Municipality borders
+      # Municipality boundaries
       g <- g + geom_polygon(data = muns_f,
                             aes(long, lat, group = group),
                             linetype = "solid",
@@ -1189,6 +1079,7 @@ server <- function(input, output, session){
                             size = 0.8)
     }
     if(input$show_subdivs == TRUE) {
+      # Subdivision boundaries
       g <- g + geom_polygon(data = suuralue_f,
                             aes(long, lat, group = group),
                             linetype = "solid",
@@ -1196,7 +1087,35 @@ server <- function(input, output, session){
                             fill = "NA",
                             size = 0.8)
     }
-      
+    if(input$show_int_labels == TRUE) {
+      # Show current Jenks breaks value in zipcode area polygons 
+      g <- g + with(current_centr,
+                    annotate(geom = "text",
+                             x = long, 
+                             y = lat, 
+                             label = label, 
+                             size = 4))
+    }
+    if(input$show_muns_labels == TRUE) {
+      # Show municipality labels
+      g <- g + with(muns_cntr,
+                    annotate(geom = "text", 
+                             x = long, 
+                             y = lat, 
+                             label = label, 
+                             size = 5,
+                             fontface = 2))
+    }
+    if(input$show_subdivs_labels == TRUE) {
+      # Show subdivision labels
+      g <- g + with(subdiv_cntr[!subdiv_cntr$label %in% gsub(".* ", "", c(input$subdivGroup)), ], 
+                    annotate(geom = "text",
+                             x = long,
+                             y = lat,
+                             label = label,
+                             size = 4))
+    }
+    
     g <- g + coord_fixed(xlim = c(minlon, maxlon),
                          ylim = c(minlat, maxlat)) +
       
@@ -1209,17 +1128,6 @@ server <- function(input, output, session){
       theme(legend.title = element_text(size = 15),
             legend.text = element_text(size = 14),
             plot.caption = element_text(size = 13, hjust = 0.5, face = "italic"))
-    
-    
-    # Label switch boolean test
-    if(input$show_int_labels == TRUE) {
-      g = g + with(current_centr,
-                   annotate(geom = "text",
-                            x = long, 
-                            y = lat, 
-                            label = label, 
-                            size = 4))
-    }
     
     
     # Prepare the downloadable interactive map. "interactive_out" is brought 
@@ -1240,7 +1148,7 @@ server <- function(input, output, session){
   })
   
   
-  #### 5.10.1 Download interactive map ----
+  #### 5.9.1 Download interactive map ----
   output$dl_interactive <- downloadHandler(
     filename = paste("interactive-map_",
                      "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
@@ -1253,6 +1161,7 @@ server <- function(input, output, session){
     }
   )
 }
+
 
 
 ### 6 ShinyApp UI elements ----------------------------------------------------- 
@@ -1278,7 +1187,7 @@ ui <- shinyUI(fluidPage(
                       type = "text/css", 
                       href = "https://use.fontawesome.com/releases/v5.13.0/css/all.css"),
             htmltools::includeCSS(csspath)),
-  includeScript(path = jspath),
+  htmltools::includeScript(path = jspath),
   
   
   
@@ -1286,200 +1195,211 @@ ui <- shinyUI(fluidPage(
   titlePanel(NULL, windowTitle = "Sampo Vesanen MSc thesis research survey results"),
   sidebarLayout(
     sidebarPanel(id = "sidebar",
-      
-      ### 6.2.1 Table of contents ----
-      # &nbsp; is a non-breaking space
-      HTML("<div id='contents'>"),
-      HTML("<p id='linkheading_t'>Analysis</p>"),
-      HTML("<a href='#descrilink'>1&nbsp;Descriptive statistics</a> &mdash;"),
-      HTML("<a href='#histlink'>2&nbsp;Histogram</a> &mdash;"),
-      HTML("<a href='#barplotlink'>3&nbsp;Barplot</a> &mdash;"),
-      HTML("<a href='#boxplotlink'>4&nbsp;Boxplot</a> &mdash;"),
-      HTML("<a href='#levenelink'>5&nbsp;Levene</a> &mdash;"),
-      HTML("<a href='#anovalink'>6&nbsp;One-way ANOVA</a> &mdash;"),
-      HTML("<a href='#brownlink'>7&nbsp;Brown-Forsythe</a><br>"),
-      HTML("<p id='linkheading_b'>Visualisation</p>"),
-      HTML("<a href='#maplink'>8&nbsp;Context map</a> &mdash;"),
-      HTML("<a href='#intmaplink'>9&nbsp;Interactive map</a>"),
-      HTML("</div>"),
-      
-      
-      ### 6.2.2 Maximum allowed values ----
-      # Set allowed maximum for parktime and walktime. Default is 60 for both.
-      HTML("<div id='stats-settings-link'>",
-          "<label>Set maximum allowed values",
-          "<p id='smalltext'>(Affects sections 1&mdash;7, 9)</p></label>",
-          "<div id='contents'>"),
-      sliderInput(
-       "parktime_max",
-       HTML("parktime (min)"),
-       min = min(thesisdata$parktime),
-       max = max(thesisdata$parktime),
-       value = 59,
-       step = 1),
-      
-      sliderInput(
-       "walktime_max",
-       HTML("walktime (min)"), 
-       min = min(thesisdata$walktime),
-       max = max(thesisdata$walktime),
-       value = 59,
-       step = 1),
-      
-      actionButton(
-       "resetParkWalk", 
-       HTML("<i class='icon history'></i>Revert values to default (59&nbsp;min)")),
-      
-      HTML("</div>"),
-      
-      
-      ### 6.2.3 Active variables ----
-      # Select walktime or parktime
-      HTML("<label>Currently active variables",
-          "<p id='smalltext'>(Affects sections 1&mdash;7, 9)</p>",
-          "</label>",
-          "<div id='contents'>"),
-      selectInput(
-       "resp", 
-       HTML("Response (continuous)"),
-       names(thesisdata[continuous])),
-      
-      # likert, parkspot, timeofday, ua_forest, ykr_zone, subdiv
-      selectInput(
-       "expl",
-       "Explanatory (ordinal)", 
-       names(thesisdata[ordinal])),
-      
-      # These are changed with the observer function
-      checkboxGroupInput(
-       "checkGroup",
-       "Select inactive groups in current explanatory variable",
-       choiceNames = c("Item A", "Item B", "Item C"),
-       choiceValues = c("a", "b", "c")),
-      HTML("</div></div>"),
-      
-      
-      ### 6.2.4 Histogram ----
-      # Allow user to access histogram binwidth
-      HTML("<div id='hist-settings-link'>",
-          "<label>2 Histogram",
-          "<a id='smalltext' href='#histlink'><i class='icon link' title='Go to the plot'></i></a></label>",
-          "<div id='contents'>"),
-      sliderInput(
-       "bin",
-       HTML("Binwidth for the current response variable"), 
-       min = 1, 
-       max = 10, 
-       value = 2),
-      HTML("</div></div>"),
-      
-      
-      ### 6.2.5 Barplot ----
-      # Provide user possibility to see distribution of answers within the
-      # ordinal variables.
-      # The values of this conditionalPanel are changed with the observer
-      # function
-      conditionalPanel(
-       condition = 
-         "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-       
-       HTML("<div id='barplot-settings-link'>",
-            "<label>3 Distribution of ordinal variables",
-            "<a id='smalltext' href='#barplotlink'><i class='icon link' title='Go to the plot'></i></a></label>",
-            "<div id='contents'>"),
-       selectInput(
-         "barplot", 
-         HTML("Y axis for the barplot"),
-         names(thesisdata[c("zipcode", "likert", "walktime")]),
-       ),
-       HTML("</div></div>")
-      ),
-      
-      
-      ### 6.2.6 Inactive subdivisions ----
-      # Select to inactivate subdivs. Overrides all options (except interactive 
-      # map) 
-      HTML("<div id='subdiv-settings-link'>",
-          "<label>Select inactive subdivisions",
-          "<p id='smalltext'>",
-          "(Affects sections 1&mdash;9. Please be aware that these selections",
-          "override Explanatory (ordinal) variable 'subdiv')</p></label>",
-          "<div id='contents'>"),
-      checkboxGroupInput(
-       "subdivGroup",
-       NULL,
-       choiceNames = sort(as.character(unique(thesisdata$subdiv))),
-       choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
-      
-      # Reset inactivations with this button
-      actionButton(
-       "resetSubdivs", 
-       HTML("<i class='icon history'></i>Clear all selections")),
-      HTML("</div></div>"),
-      
-      
-      ### 6.2.7 Interactive map ----
-      # Interactive map Jenks breaks options
-      HTML("<div id='intmap-settings-link'>",
-          "<label>9 Interactive map",
-          "<a id='smalltext' href='#intmaplink'><i class='icon link' title='Go to the map'></i></a></label>",
-          "<div id='contents'>"),
-      checkboxGroupInput(
-       "kunta",
-       HTML("Active municipalities"),
-       choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
-       choiceValues = c("091", "092", "049", "235")),
-      
-      selectInput(
-       "karttacol",
-       HTML("Jenks breaks parameter"),
-       c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
-         "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
-      
-      # On-off switches
-      HTML("<div style='text-align: center;margin-bottom: 10px;'>"),
-      HTML("<div>"),
-      # Switch for interactive map labels
-      HTML("<label class='control-label' for='show_int_labels'>Show labels</label>"),
-      shinyWidgets::switchInput(
-       inputId = "show_int_labels", 
-       size = "mini",
-       inline = TRUE,
-       value = TRUE),
-      HTML("</div>"),
-      
-      # Switch for muns
-      HTML("<div>"),
-      HTML("<label class='control-label' for='show_muns'>Show muns</label>"),
-      shinyWidgets::switchInput(
-       inputId = "show_muns", 
-       size = "mini",
-       inline = TRUE,
-       value = TRUE),
-      HTML("</div>"),
-      
-      # Switch for subdivisions
-      HTML("<div>"),
-      HTML("<label class='control-label' for='show_subdivs'>Show subdivs</label>"),
-      shinyWidgets::switchInput(
-       inputId = "show_subdivs", 
-       size = "mini",
-       inline = TRUE,
-       value = FALSE),
-      HTML("</div>"),
-      HTML("</div>"),
-      
-      sliderInput(
-       "jenks_n",
-       "Amount of classes",
-       min = 2, 
-       max = 8, 
-       value = 5),
-      
-      HTML("</div></div>"),
-      HTML("<p id='version-info'>Analysis app version 22.5.2020</p>"),
-      
-      width = 3
+                 
+                 ### 6.2.1 Table of contents ----
+                 # &nbsp; is a non-breaking space
+                 HTML("<div id='contents'>",
+                      "<p id='linkheading_t'>Analysis</p>",
+                      "<a href='#descrilink'>1&nbsp;Descriptive statistics</a> &mdash;",
+                      "<a href='#histlink'>2&nbsp;Histogram</a> &mdash;",
+                      "<a href='#barplotlink'>3&nbsp;Barplot</a> &mdash;",
+                      "<a href='#boxplotlink'>4&nbsp;Boxplot</a> &mdash;",
+                      "<a href='#levenelink'>5&nbsp;Levene</a> &mdash;",
+                      "<a href='#anovalink'>6&nbsp;One-way ANOVA</a> &mdash;",
+                      "<a href='#brownlink'>7&nbsp;Brown-Forsythe</a><br>",
+                      "<p id='linkheading_b'>Visualisation</p>",
+                      "<a href='#intmaplink'>8&nbsp;Interactive map</a>",
+                      "</div>"),
+                 
+                 
+                 ### 6.2.2 Maximum allowed values ----
+                 # Set allowed maximum for parktime and walktime. Default is 60 for both.
+                 HTML("<div id='stats-settings-link'>",
+                      "<label>Set maximum allowed values",
+                      "<p id='smalltext'>(Affects sections 1&mdash;8)</p></label>",
+                      "<div id='contents'>"),
+                 sliderInput(
+                   "parktime_max",
+                   HTML("parktime (min)"),
+                   min = min(thesisdata$parktime),
+                   max = max(thesisdata$parktime),
+                   value = 59,
+                   step = 1),
+                 
+                 sliderInput(
+                   "walktime_max",
+                   HTML("walktime (min)"), 
+                   min = min(thesisdata$walktime),
+                   max = max(thesisdata$walktime),
+                   value = 59,
+                   step = 1),
+                 
+                 actionButton(
+                   "resetParkWalk", 
+                   HTML("<i class='icon history'></i>Revert values to default (59&nbsp;min)")),
+                 
+                 HTML("</div>"),
+                 
+                 
+                 ### 6.2.3 Active variables ----
+                 # Select walktime or parktime
+                 HTML("<label>Currently active variables",
+                      "<p id='smalltext'>(Affects sections 1&mdash;8)</p>",
+                      "</label>",
+                      "<div id='contents'>"),
+                 selectInput(
+                   "resp", 
+                   HTML("Response (continuous)"),
+                   names(thesisdata[continuous])),
+                 
+                 # likert, parkspot, timeofday, ua_forest, ykr_zone, subdiv
+                 selectInput(
+                   "expl",
+                   "Explanatory (ordinal)", 
+                   names(thesisdata[ordinal])),
+                 
+                 # These are changed with the observer function
+                 checkboxGroupInput(
+                   "checkGroup",
+                   "Select inactive groups in current explanatory variable",
+                   choiceNames = c("Item A", "Item B", "Item C"),
+                   choiceValues = c("a", "b", "c")),
+                 HTML("</div>",
+                      "</div>"),
+                 
+                 
+                 ### 6.2.4 Histogram ----
+                 # Allow user to access histogram binwidth
+                 HTML("<div id='hist-settings-link'>",
+                      "<label>2 Histogram",
+                      "<a id='smalltext' href='#histlink'><i class='icon link' title='Go to the plot'></i></a></label>",
+                      "<div id='contents'>"),
+                 sliderInput(
+                   "bin",
+                   HTML("Binwidth for the current response variable"), 
+                   min = 1, 
+                   max = 10, 
+                   value = 2),
+                 HTML("</div>",
+                      "</div>"),
+                 
+                 
+                 ### 6.2.5 Barplot ----
+                 # Provide user possibility to see distribution of answers within the
+                 # ordinal variables.
+                 # The values of this conditionalPanel are changed with the observer
+                 # function
+                 conditionalPanel(
+                   condition = 
+                     "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
+                   
+                   HTML("<div id='barplot-settings-link'>",
+                        "<label>3 Distribution of ordinal variables",
+                        "<a id='smalltext' href='#barplotlink'><i class='icon link' title='Go to the plot'></i></a></label>",
+                        "<div id='contents'>"),
+                   selectInput(
+                     "barplot", 
+                     HTML("Y axis for the barplot"),
+                     names(thesisdata[c("zipcode", "likert", "walktime")]),
+                   ),
+                   HTML("</div>",
+                        "</div>")
+                 ),
+                 
+                 
+                 ### 6.2.6 Inactive subdivisions ----
+                 # Select to inactivate subdivs. Overrides all options (except interactive 
+                 # map) 
+                 HTML("<div id='subdiv-settings-link'>",
+                      "<label>Select inactive subdivisions",
+                      "<p id='smalltext'>",
+                      "(Affects sections 1&mdash;8. Please be aware that these selections",
+                      "override Explanatory (ordinal) variable 'subdiv')</p></label>",
+                      "<div id='contents'>"),
+                 checkboxGroupInput(
+                   "subdivGroup",
+                   NULL,
+                   choiceNames = sort(as.character(unique(thesisdata$subdiv))),
+                   choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
+                 
+                 # Reset inactivations with this button
+                 actionButton(
+                   "resetSubdivs", 
+                   HTML("<i class='icon history'></i>Clear all selections")),
+                 HTML("</div>",
+                      "</div>"),
+                 
+                 
+                 ### 6.2.7 Interactive map ----
+                 # Interactive map Jenks breaks options
+                 HTML("<div id='intmap-settings-link'>",
+                      "<label>9 Interactive map",
+                      "<a id='smalltext' href='#intmaplink'><i class='icon link' title='Go to the map'></i></a></label>",
+                      "<div id='contents'>"),
+                 checkboxGroupInput(
+                   "kunta",
+                   HTML("Active municipalities"),
+                   choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
+                   choiceValues = c("091", "092", "049", "235")),
+                 
+                 selectInput(
+                   "karttacol",
+                   HTML("Jenks breaks parameter"),
+                   c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
+                     "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
+                 
+                 sliderInput(
+                   "jenks_n",
+                   "Amount of classes",
+                   min = 2, 
+                   max = 8, 
+                   value = 5),
+                 
+                 # Layer options: on-off switches
+                 HTML("<label class='control-label'>Layer options</label>",
+                      "<div class='onoff-container'>",
+                      "<div class='onoff-div'><b>Postal code areas</b><br>"),
+                 # Switch for interactive map labels
+                 HTML("<label class='control-label onoff-label' for='show_int_labels'>Labels</label>"),
+                 shinyWidgets::switchInput(
+                   inputId = "show_int_labels", 
+                   size = "mini",
+                   value = TRUE),
+                 HTML("</div>"),
+                 
+                 # Switches for muns
+                 HTML("<div class='onoff-div'><b>Municipalities</b><br>",
+                      "<label class='control-label onoff-label' for='show_muns'>Boundaries</label>"),
+                 shinyWidgets::switchInput(
+                   inputId = "show_muns", 
+                   size = "mini",
+                   value = TRUE),
+                 HTML("<label class='control-label onoff-label' for='show_muns_labels'>Labels</label>"),
+                 shinyWidgets::switchInput(
+                   inputId = "show_muns_labels", 
+                   size = "mini",
+                   value = FALSE),
+                 HTML("</div>"),
+                 
+                 # Switches for subdivisions
+                 HTML("<div class='onoff-div'><b>Subdivisions</b><br>",
+                      "<label class='control-label onoff-label' for='show_subdivs'>Boundaries</label>"),
+                 shinyWidgets::switchInput(
+                   inputId = "show_subdivs", 
+                   size = "mini",
+                   value = FALSE),
+                 HTML("<label class='control-label onoff-label' for='show_subdivs_labels'>Labels</label>"),
+                 shinyWidgets::switchInput(
+                   inputId = "show_subdivs_labels", 
+                   size = "mini",
+                   value = FALSE),
+                 HTML("</div>",
+                      "</div>",
+                      "</div>",
+                      "</div>",
+                      "<p id='version-info'>Analysis app version 22.5.2020</p>"),
+                 
+                 width = 3
     ),
     
     
@@ -1493,8 +1413,8 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       # Descriptive statistics
-      HTML("<div id='descrilink'>"),
-      HTML("<h3>1 Descriptive statistics&ensp;",
+      HTML("<div id='descrilink'>",
+           "<h3>1 Descriptive statistics&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('descri','descrilink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
@@ -1506,8 +1426,8 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       # Histogram
-      HTML("<div id='histlink'>"),
-      HTML("<h3>2 Histogram&ensp;",
+      HTML("<div id='histlink'>",
+           "<h3>2 Histogram&ensp;",
            "<a href='#hist-settings-link'><i class='icon wrench' title='Go to histogram settings'></i></a>",           
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
@@ -1520,17 +1440,17 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       # Barplot
-      HTML("<div id='barplotlink'>"),
-      HTML("<h3>3 Distribution of ordinal variables&ensp;",
+      HTML("<div id='barplotlink'>",
+           "<h3>3 Distribution of ordinal variables&ensp;",
            "<a href='#barplot-settings-link'><i class='icon wrench' title='Go to barplot settings'></i></a>",           
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('barplot_wrap','barplotlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_barplot",
                    label = HTML("<i class='icon file' title='Download hi-res version of this plot (png)'></i>")),
-      HTML("</h3>"),
-      HTML("<div id='barplot_wrap'>"),
-      HTML("<p>This plot is active when <tt>likert</tt>, <tt>parkspot</tt>, or", 
+      HTML("</h3>",
+           "<div id='barplot_wrap'>",
+           "<p>This plot is active when <tt>likert</tt>, <tt>parkspot</tt>, or", 
            "<tt>timeofday</tt> is selected as the explanatory (ordinal)",
            "variable.</p>"),
       conditionalPanel(
@@ -1543,8 +1463,8 @@ ui <- shinyUI(fluidPage(
       HTML("</div>"),
       
       # Boxplot
-      HTML("<div id='boxplotlink'>"),
-      HTML("<h3>4 Boxplot&ensp;",
+      HTML("<div id='boxplotlink'>",
+           "<h3>4 Boxplot&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('boxplot','boxplotlink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
@@ -1556,15 +1476,15 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       # Levene's test. Significance legend is inserted with JavaScript
-      HTML("<div id='levenelink'>"),
-      HTML("<h3>5 Test for homogeneity of variances (Levene's test)&ensp;",
+      HTML("<div id='levenelink'>",
+           "<h3>5 Test for homogeneity of variances (Levene's test)&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('levene_wrap','levenelink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_levene",
                    label = HTML("<i class='icon file' title='Download this table as csv'></i>")),
-      HTML("</h3>"),
-      HTML("<div id='levene_wrap'>"),
+      HTML("</h3>",
+           "<div id='levene_wrap'>"),
       p("Look for p-value > 0.05 (0.05 '.' 0.1 ' ' 1) (variance across groups",
         "is not statistically significant) for ANOVA test to be meaningful. If",
         "p < 0.05, null hypothesis is rejected and it can be concluded that there",
@@ -1575,29 +1495,30 @@ ui <- shinyUI(fluidPage(
       hr(),
       
       # ANOVA
-      HTML("<div id='anovalink'>"),
-      HTML("<h3>6 One-way analysis of variance (One-way ANOVA)&ensp;",
+      HTML("<div id='anovalink'>",
+           "<h3>6 One-way analysis of variance (One-way ANOVA)&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('anova_wrap','anovalink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
       downloadLink("dl_anova",
                    label = HTML("<i class='icon file' title='Download this table as csv'></i>")),
-      HTML("</h3>"),
-      HTML("<div id='anova_wrap'>"),
+      HTML("</h3>",
+           "<div id='anova_wrap'>"),
       tableOutput("anova"),
-      HTML("</div></div>"),
+      HTML("</div>",
+           "</div>"),
       hr(),
       
       # Brown & Forsythe
-      HTML("<div id='brownlink'>"),
-      HTML("<h3>7 Brown-Forsythe test&ensp;",
+      HTML("<div id='brownlink'>",
+           "<h3>7 Brown-Forsythe test&ensp;",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
            "<button id='showhidebutton' onclick=\"show_hide('brown_wrap', 'brownlink')\"><i class='icon eyeslash' title='Hide element'></i></button></button>"),
       downloadLink("dl_brown",
                    label = HTML("<i class='icon file' title='Download this output as txt'></i>")),
-      HTML("</h3>"),
-      HTML("<div id='brown_wrap'>"),
+      HTML("</h3>",
+           "<div id='brown_wrap'>"),
       p("Look for a statistically significant difference between the selected", 
         "explanatory variable. Brown-Forsythe test is less likely than the",
         "Levene test to incorrectly declare that the assumption of equal", 
@@ -1605,24 +1526,13 @@ ui <- shinyUI(fluidPage(
         "fails when selected response variable maximum value is set to 0. The",
         "test requires a p.value that's not NaN."),
       verbatimTextOutput("brownf"),
-      HTML("</div></div>"),
-      hr(),
-      
-      # Context map
-      HTML("<div id='maplink'>"),
-      HTML("<h3>8 Active subdivisions&ensp;",
-           "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
-           "<button id='showhidebutton' onclick=\"show_hide('map', 'maplink')\"><i class='icon eyeslash' title='Hide element'></i></button>"),
-      downloadLink("dl_map",
-                   label = HTML("<i class='icon file' title='Download hi-res version of this figure (png)'></i>")),
-      HTML("</h3>"),
-      ggiraphOutput("map"),
-      HTML("</div>"),
+      HTML("</div>",
+           "</div>"),
       hr(),
       
       # Interactive map
-      HTML("<div id='intmaplink'>"),
-      HTML("<h3>9 Survey results on research area map&ensp;",
+      HTML("<div id='intmaplink'>",
+           "<h3>8 Survey results on research area map&ensp;",
            "<a href='#intmap-settings-link'><i class='icon wrench' title='Go to interactive map settings'></i></a>",
            "<a href='#stats-settings-link'><i class='icon chart' title='Go to active variables'></i></a>",
            "<a href='#subdiv-settings-link'><i class='icon mapmark' title='Go to inactive subdivisions'></i></a>",
