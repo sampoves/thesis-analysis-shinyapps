@@ -1196,210 +1196,212 @@ ui <- shinyUI(fluidPage(
   sidebarLayout(
     sidebarPanel(id = "sidebar",
                  
-                 ### 6.2.1 Table of contents ----
-                 # &nbsp; is a non-breaking space
-                 HTML("<div id='contents'>",
-                      "<p id='linkheading_t'>Analysis</p>",
-                      "<a href='#descrilink'>1&nbsp;Descriptive statistics</a> &mdash;",
-                      "<a href='#histlink'>2&nbsp;Histogram</a> &mdash;",
-                      "<a href='#barplotlink'>3&nbsp;Barplot</a> &mdash;",
-                      "<a href='#boxplotlink'>4&nbsp;Boxplot</a> &mdash;",
-                      "<a href='#levenelink'>5&nbsp;Levene</a> &mdash;",
-                      "<a href='#anovalink'>6&nbsp;One-way ANOVA</a> &mdash;",
-                      "<a href='#brownlink'>7&nbsp;Brown-Forsythe</a><br>",
-                      "<p id='linkheading_b'>Visualisation</p>",
-                      "<a href='#intmaplink'>8&nbsp;Interactive map</a>",
-                      "</div>"),
-                 
-                 
-                 ### 6.2.2 Maximum allowed values ----
-                 # Set allowed maximum for parktime and walktime. Default is 60 for both.
-                 HTML("<div id='stats-settings-link'>",
-                      "<label>Set maximum allowed values",
-                      "<p id='smalltext'>(Affects sections 1&mdash;8)</p></label>",
-                      "<div id='contents'>"),
-                 sliderInput(
-                   "parktime_max",
-                   HTML("parktime (min)"),
-                   min = min(thesisdata$parktime),
-                   max = max(thesisdata$parktime),
-                   value = 59,
-                   step = 1),
-                 
-                 sliderInput(
-                   "walktime_max",
-                   HTML("walktime (min)"), 
-                   min = min(thesisdata$walktime),
-                   max = max(thesisdata$walktime),
-                   value = 59,
-                   step = 1),
-                 
-                 actionButton(
-                   "resetParkWalk", 
-                   HTML("<i class='icon history'></i>Revert values to default (59&nbsp;min)")),
-                 
-                 HTML("</div>"),
-                 
-                 
-                 ### 6.2.3 Active variables ----
-                 # Select walktime or parktime
-                 HTML("<label>Currently active variables",
-                      "<p id='smalltext'>(Affects sections 1&mdash;8)</p>",
-                      "</label>",
-                      "<div id='contents'>"),
-                 selectInput(
-                   "resp", 
-                   HTML("Response (continuous)"),
-                   names(thesisdata[continuous])),
-                 
-                 # likert, parkspot, timeofday, ua_forest, ykr_zone, subdiv
-                 selectInput(
-                   "expl",
-                   "Explanatory (ordinal)", 
-                   names(thesisdata[ordinal])),
-                 
-                 # These are changed with the observer function
-                 checkboxGroupInput(
-                   "checkGroup",
-                   "Select inactive groups in current explanatory variable",
-                   choiceNames = c("Item A", "Item B", "Item C"),
-                   choiceValues = c("a", "b", "c")),
-                 HTML("</div>",
-                      "</div>"),
-                 
-                 
-                 ### 6.2.4 Histogram ----
-                 # Allow user to access histogram binwidth
-                 HTML("<div id='hist-settings-link'>",
-                      "<label>2 Histogram",
-                      "<a id='smalltext' href='#histlink'><i class='icon link' title='Go to the plot'></i></a></label>",
-                      "<div id='contents'>"),
-                 sliderInput(
-                   "bin",
-                   HTML("Binwidth for the current response variable"), 
-                   min = 1, 
-                   max = 10, 
-                   value = 2),
-                 HTML("</div>",
-                      "</div>"),
-                 
-                 
-                 ### 6.2.5 Barplot ----
-                 # Provide user possibility to see distribution of answers within the
-                 # ordinal variables.
-                 # The values of this conditionalPanel are changed with the observer
-                 # function
-                 conditionalPanel(
-                   condition = 
-                     "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-                   
-                   HTML("<div id='barplot-settings-link'>",
-                        "<label>3 Distribution of ordinal variables",
-                        "<a id='smalltext' href='#barplotlink'><i class='icon link' title='Go to the plot'></i></a></label>",
-                        "<div id='contents'>"),
-                   selectInput(
-                     "barplot", 
-                     HTML("Y axis for the barplot"),
-                     names(thesisdata[c("zipcode", "likert", "walktime")]),
-                   ),
-                   HTML("</div>",
-                        "</div>")
-                 ),
-                 
-                 
-                 ### 6.2.6 Inactive subdivisions ----
-                 # Select to inactivate subdivs. Overrides all options (except interactive 
-                 # map) 
-                 HTML("<div id='subdiv-settings-link'>",
-                      "<label>Select inactive subdivisions",
-                      "<p id='smalltext'>",
-                      "(Affects sections 1&mdash;8. Please be aware that these selections",
-                      "override Explanatory (ordinal) variable 'subdiv')</p></label>",
-                      "<div id='contents'>"),
-                 checkboxGroupInput(
-                   "subdivGroup",
-                   NULL,
-                   choiceNames = sort(as.character(unique(thesisdata$subdiv))),
-                   choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
-                 
-                 # Reset inactivations with this button
-                 actionButton(
-                   "resetSubdivs", 
-                   HTML("<i class='icon history'></i>Clear all selections")),
-                 HTML("</div>",
-                      "</div>"),
-                 
-                 
-                 ### 6.2.7 Interactive map ----
-                 # Interactive map Jenks breaks options
-                 HTML("<div id='intmap-settings-link'>",
-                      "<label>9 Interactive map",
-                      "<a id='smalltext' href='#intmaplink'><i class='icon link' title='Go to the map'></i></a></label>",
-                      "<div id='contents'>"),
-                 checkboxGroupInput(
-                   "kunta",
-                   HTML("Active municipalities"),
-                   choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
-                   choiceValues = c("091", "092", "049", "235")),
-                 
-                 selectInput(
-                   "karttacol",
-                   HTML("Jenks breaks parameter"),
-                   c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
-                     "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
-                 
-                 sliderInput(
-                   "jenks_n",
-                   "Amount of classes",
-                   min = 2, 
-                   max = 8, 
-                   value = 5),
-                 
-                 # Layer options: on-off switches
-                 HTML("<label class='control-label'>Layer options</label>",
-                      "<div class='onoff-container'>",
-                      "<div class='onoff-div'><b>Postal code areas</b><br>"),
-                 # Switch for interactive map labels
-                 HTML("<label class='control-label onoff-label' for='show_int_labels'>Labels</label>"),
-                 shinyWidgets::switchInput(
-                   inputId = "show_int_labels", 
-                   size = "mini",
-                   value = TRUE),
-                 HTML("</div>"),
-                 
-                 # Switches for muns
-                 HTML("<div class='onoff-div'><b>Municipalities</b><br>",
-                      "<label class='control-label onoff-label' for='show_muns'>Boundaries</label>"),
-                 shinyWidgets::switchInput(
-                   inputId = "show_muns", 
-                   size = "mini",
-                   value = TRUE),
-                 HTML("<label class='control-label onoff-label' for='show_muns_labels'>Labels</label>"),
-                 shinyWidgets::switchInput(
-                   inputId = "show_muns_labels", 
-                   size = "mini",
-                   value = FALSE),
-                 HTML("</div>"),
-                 
-                 # Switches for subdivisions
-                 HTML("<div class='onoff-div'><b>Subdivisions</b><br>",
-                      "<label class='control-label onoff-label' for='show_subdivs'>Boundaries</label>"),
-                 shinyWidgets::switchInput(
-                   inputId = "show_subdivs", 
-                   size = "mini",
-                   value = FALSE),
-                 HTML("<label class='control-label onoff-label' for='show_subdivs_labels'>Labels</label>"),
-                 shinyWidgets::switchInput(
-                   inputId = "show_subdivs_labels", 
-                   size = "mini",
-                   value = FALSE),
-                 HTML("</div>",
-                      "</div>",
-                      "</div>",
-                      "</div>",
-                      "<p id='version-info'>Analysis app version 22.5.2020</p>"),
-                 
-                 width = 3
+      ### 6.2.1 Table of contents ----
+      # &nbsp; is a non-breaking space
+      HTML("<div id='contents'>",
+           "<p id='linkheading_t'>Analysis</p>",
+           "<a href='#descrilink'>1&nbsp;Descriptive statistics</a> &mdash;",
+           "<a href='#histlink'>2&nbsp;Histogram</a> &mdash;",
+           "<a href='#barplotlink'>3&nbsp;Barplot</a> &mdash;",
+           "<a href='#boxplotlink'>4&nbsp;Boxplot</a> &mdash;",
+           "<a href='#levenelink'>5&nbsp;Levene</a> &mdash;",
+           "<a href='#anovalink'>6&nbsp;One-way ANOVA</a> &mdash;",
+           "<a href='#brownlink'>7&nbsp;Brown-Forsythe</a><br>",
+           "<p id='linkheading_b'>Visualisation</p>",
+           "<a href='#intmaplink'>8&nbsp;Interactive map</a>",
+           "</div>"),
+     
+     
+      ### 6.2.2 Maximum allowed values ----
+      # Set allowed maximum for parktime and walktime. Default is 60 for both.
+      HTML("<div id='stats-settings-link'>",
+           "<label>Set maximum allowed values",
+           "<p id='smalltext'>(Affects sections 1&mdash;8)</p></label>",
+           "<div id='contents'>"),
+      sliderInput(
+        "parktime_max",
+        HTML("parktime (min)"),
+        min = min(thesisdata$parktime),
+        max = max(thesisdata$parktime),
+        value = 59,
+        step = 1),
+     
+      sliderInput(
+        "walktime_max",
+        HTML("walktime (min)"), 
+        min = min(thesisdata$walktime),
+        max = max(thesisdata$walktime),
+        value = 59,
+        step = 1),
+     
+      actionButton(
+        "resetParkWalk", 
+        HTML("<i class='icon history'></i>Revert values to default (59&nbsp;min)")),
+     
+      HTML("</div>"),
+     
+     
+      ### 6.2.3 Active variables ----
+      # Select walktime or parktime
+      HTML("<label>Currently active variables",
+           "<p id='smalltext'>(Affects sections 1&mdash;8)</p>",
+           "</label>",
+           "<div id='contents'>"),
+      selectInput(
+        "resp", 
+        HTML("Response (continuous)"),
+        names(thesisdata[continuous])),
+     
+      # likert, parkspot, timeofday, ua_forest, ykr_zone, subdiv
+      selectInput(
+        "expl",
+        "Explanatory (ordinal)", 
+        names(thesisdata[ordinal])),
+     
+      # These are changed with the observer function
+      checkboxGroupInput(
+        "checkGroup",
+        "Select inactive groups in current explanatory variable",
+        choiceNames = c("Item A", "Item B", "Item C"),
+        choiceValues = c("a", "b", "c")),
+      HTML("</div>",
+           "</div>"),
+     
+     
+      ### 6.2.4 Histogram ----
+      # Allow user to access histogram binwidth
+      HTML("<div id='hist-settings-link'>",
+           "<label>2 Histogram",
+           "<a id='smalltext' href='#histlink'><i class='icon link' title='Go to the plot'></i></a></label>",
+           "<div id='contents'>"),
+      sliderInput(
+        "bin",
+        HTML("Binwidth for the current response variable"), 
+        min = 1, 
+        max = 10, 
+        value = 2),
+      HTML("</div>",
+           "</div>"),
+     
+     
+      ### 6.2.5 Barplot ----
+      # Provide user possibility to see distribution of answers within the
+      # ordinal variables.
+      # The values of this conditionalPanel are changed with the observer
+      # function
+      conditionalPanel(
+        condition = 
+          "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
+       
+        HTML("<div id='barplot-settings-link'>",
+             "<label>3 Distribution of ordinal variables",
+             "<a id='smalltext' href='#barplotlink'><i class='icon link' title='Go to the plot'></i></a></label>",
+             "<div id='contents'>"),
+        selectInput(
+          "barplot", 
+          HTML("Y axis for the barplot"),
+          names(thesisdata[c("zipcode", "likert", "walktime")]),
+        ),
+        HTML("</div>",
+            "</div>")
+      ),
+     
+     
+      ### 6.2.6 Inactive subdivisions ----
+      # Select to inactivate subdivs. Overrides all options (except interactive 
+      # map) 
+      HTML("<div id='subdiv-settings-link'>",
+           "<label>Select inactive subdivisions",
+           "<p id='smalltext'>",
+           "(Affects sections 1&mdash;8. Please be aware that these selections",
+           "override Explanatory (ordinal) variable 'subdiv')</p></label>",
+           "<div id='contents'>"),
+      checkboxGroupInput(
+        "subdivGroup",
+        NULL,
+        choiceNames = sort(as.character(unique(thesisdata$subdiv))),
+        choiceValues = sort(as.character(unique(thesisdata$subdiv)))),
+     
+      # Reset inactivations with this button
+      actionButton(
+        "resetSubdivs", 
+        HTML("<i class='icon history'></i>Clear all selections")),
+      HTML("</div>",
+           "</div>"),
+     
+     
+      ### 6.2.7 Interactive map ----
+      # Interactive map Jenks breaks options
+      HTML("<div id='intmap-settings-link'>",
+           "<label>9 Interactive map",
+           "<a id='smalltext' href='#intmaplink'><i class='icon link' title='Go to the map'></i></a></label>",
+           "<div id='contents'>"),
+      checkboxGroupInput(
+        "kunta",
+        HTML("Active municipalities"),
+        choiceNames = c("Helsinki", "Vantaa", "Espoo", "Kauniainen"),
+        choiceValues = c("091", "092", "049", "235")),
+     
+      selectInput(
+        "karttacol",
+        HTML("Jenks breaks parameter"),
+        c("jenks_answer_count", "jenks_park_mean", "jenks_park_median", 
+          "jenks_walk_mean", "jenks_walk_median", "jenks_ua_forest")),
+     
+      sliderInput(
+        "jenks_n",
+        "Amount of classes",
+        min = 2, 
+        max = 8, 
+        value = 5),
+     
+      # Layer options: on-off switches
+      HTML("<label class='control-label'>Layer options</label>",
+           "<div class='onoff-container'>",
+           "<div class='onoff-div'><b>Postal code areas</b><br>"),
+      # Switch for interactive map labels
+      HTML("<label class='control-label onoff-label' for='show_int_labels'>Labels</label>"),
+      shinyWidgets::switchInput(
+        inputId = "show_int_labels", 
+        size = "mini",
+        value = TRUE),
+      HTML("</div>"),
+     
+      # Switches for muns
+      HTML("<div class='onoff-div'><b>Municipalities</b><br>",
+           "<label class='control-label onoff-label' for='show_muns'>Boundaries</label>"),
+      shinyWidgets::switchInput(
+        inputId = "show_muns", 
+        size = "mini",
+        value = TRUE),
+      
+      HTML("<label class='control-label onoff-label' for='show_muns_labels'>Labels</label>"),
+      shinyWidgets::switchInput(
+        inputId = "show_muns_labels", 
+        size = "mini",
+        value = FALSE),
+      HTML("</div>"),
+     
+      # Switches for subdivisions
+      HTML("<div class='onoff-div'><b>Subdivisions</b><br>",
+           "<label class='control-label onoff-label' for='show_subdivs'>Boundaries</label>"),
+      shinyWidgets::switchInput(
+        inputId = "show_subdivs", 
+        size = "mini",
+        value = FALSE),
+      
+      HTML("<label class='control-label onoff-label' for='show_subdivs_labels'>Labels</label>"),
+      shinyWidgets::switchInput(
+        inputId = "show_subdivs_labels", 
+        size = "mini",
+        value = FALSE),
+      HTML("</div>",
+           "</div>",
+           "</div>",
+           "</div>",
+           "<p id='version-info'>Analysis app version 22.5.2020</p>"),
+      
+      width = 3
     ),
     
     
