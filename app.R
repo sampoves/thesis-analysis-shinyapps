@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 22.5.2020
+# 23.5.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -189,8 +189,9 @@ muns_clipped_f <- merge(ggplot2::fortify(muns_clipped),
 muns_cntr <- GetCentroids(muns_clipped_f, "nimi", "nimi")
 subdiv_cntr <- GetCentroids(suuralue_f, "Name", "Name")
 
-# Manually set better location for the annotation of Helsinki
-muns_cntr[2, 2] <- muns_cntr[2, 2] + 2000
+# Manually set better location for the annotation of Helsinki. Utilise
+# custom infix operators.
+muns_cntr[2, 2] %+=% 2000
 muns_cntr$label <- c("Espoo", "Helsinki", "Kauniainen", "Vantaa")
 
 # name labels here so that all the reordering doesn't mix up stuff
@@ -199,15 +200,20 @@ subdiv_cntr$label <- unique(suuralue_f$Name)
 # name labels here so that all the reordering doesn't mix up stuff. Remove
 # munnames from subdiv annotations
 subdiv_cntr$label <- gsub(".* ", "", unique(suuralue_f$Name)) 
+rownames(subdiv_cntr) <- gsub(".* ", "", unique(suuralue_f$Name))
 
 # Manually move labels for Espoonlahti and Southeastern as we are going to use
 # some y axis limits when drawing the map. For Espoonlahti, take lat of Helsinki
 # Southern. For long, take Pohjois-Espoo's. For Southeastern, take long of Korso.
 # Remove subdiv label for Kauniainen.
-subdiv_cntr[2, "lat"] <- subdiv_cntr[14, "lat"]
-subdiv_cntr[2, "long"] <- subdiv_cntr[1, "long"]
-subdiv_cntr[13, "lat"] <- subdiv_cntr[14, "lat"]
-subdiv_cntr[13, "long"] <- subdiv_cntr[21, "long"]
+subdiv_cntr["Suur-Espoonlahti", "lat"] <- subdiv_cntr["Southern", "lat"]
+subdiv_cntr["Suur-Espoonlahti", "long"] <- subdiv_cntr["Pohjois-Espoo", "long"]
+subdiv_cntr["Southeastern", "lat"] <- subdiv_cntr["Southern", "lat"] + 1500
+subdiv_cntr["Southeastern", "long"] <- subdiv_cntr["Korso", "long"]
+subdiv_cntr["Southern", "lat"] %+=% 3000
+subdiv_cntr["Ostersundom", "lat"] %-=% 500
+subdiv_cntr["Ostersundom", "long"] %-=% 500
+subdiv_cntr["Suur-Matinkyla", "lat"] %-=% 500
 
 
 
@@ -1024,12 +1030,12 @@ server <- function(input, output, session){
     # Finetune locations for certain labels. GetCentroids saves the second
     # parameter as rownames. We can use that to reliably find correct rows
     # to finetune.
-    current_centr["00250", 1] <- current_centr["00250", 1] + 500 # Taka-Toolo
-    current_centr["00980", 1] <- current_centr["00980", 1] - 850 # Etela-Vuosaari
-    current_centr["01640", 2] <- current_centr["01640", 2] - 300 # Hamevaara 
-    current_centr["01730", 2] <- current_centr["01730", 2] - 500 # Vantaanpuisto
-    current_centr["02380", 1] <- current_centr["02380", 1] + 2400 # Suvisaaristo
-    current_centr["02820", 1] <- current_centr["02820", 1] + 1000 # Nupuri-Nuuksio
+    current_centr["00250", 1] %+=% 500 # Taka-Toolo
+    current_centr["00980", 1] %-=% 850 # Etela-Vuosaari
+    current_centr["01640", 2] %-=% 300 # Hamevaara 
+    current_centr["01730", 2] %-=% 500 # Vantaanpuisto
+    current_centr["02380", 1] %+=% 2400 # Suvisaaristo
+    current_centr["02820", 1] %+=% 1000 # Nupuri-Nuuksio
     
     # Format map labels. Remove [, ], (, and ). Also add list dash
     labels <- gsub("(])|(\\()|(\\[)", "", levels(inputdata[, input$karttacol]))
@@ -1058,8 +1064,8 @@ server <- function(input, output, session){
                    group = "group", 
                    fill = input$karttacol,
                    tooltip = substitute(sprintf(tooltip_content,
-                                                id, nimi, answer_count, parktime_mean, parktime_median, 
-                                                walktime_mean, walktime_median, ua_forest, largest_ykr)))) +
+                      id, nimi, answer_count, parktime_mean, parktime_median, 
+                      walktime_mean, walktime_median, ua_forest, largest_ykr)))) +
       
       # Jenks classes colouring and labels
       scale_fill_brewer(palette = brewerpal,
@@ -1076,7 +1082,7 @@ server <- function(input, output, session){
                             linetype = "solid",
                             color = alpha("black", 0.9), 
                             fill = "NA",
-                            size = 0.8)
+                            size = 0.9)
     }
     if(input$show_subdivs == TRUE) {
       # Subdivision boundaries
@@ -1099,20 +1105,24 @@ server <- function(input, output, session){
     if(input$show_muns_labels == TRUE) {
       # Show municipality labels
       g <- g + with(muns_cntr,
-                    annotate(geom = "text", 
+                    annotate(geom = "label", 
                              x = long, 
                              y = lat, 
                              label = label, 
+                             label.size = NA,
+                             fill = alpha("white", 0.4),
                              size = 5,
                              fontface = 2))
     }
     if(input$show_subdivs_labels == TRUE) {
       # Show subdivision labels
-      g <- g + with(subdiv_cntr[!subdiv_cntr$label %in% gsub(".* ", "", c(input$subdivGroup)), ], 
-                    annotate(geom = "text",
+      g <- g + with(subdiv_cntr,
+                    annotate(geom = "label",
                              x = long,
                              y = lat,
                              label = label,
+                             label.size = NA,
+                             fill = alpha("white", 0.4),
                              size = 4))
     }
     
@@ -1399,7 +1409,7 @@ ui <- shinyUI(fluidPage(
            "</div>",
            "</div>",
            "</div>",
-           "<p id='version-info'>Analysis app version 22.5.2020</p>"),
+           "<p id='version-info'>Analysis app version 23.5.2020</p>"),
       
       width = 3
     ),
