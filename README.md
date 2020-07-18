@@ -1,4 +1,4 @@
-# thesis-survey-records-shiny
+# thesis-analysis-shinyapps
 shinyapps.io deployment of records analysis app.
 
 Code not tested on R 4.0.0. However, explicit ``stringsAsFactors = TRUE`` has been added to all ``read.csv()`` and ``readOGR()`` calls.
