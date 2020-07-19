@@ -176,10 +176,9 @@ muns <-
   rgdal::readOGR(munspath, stringsAsFactors = TRUE) %>%
   sp::spTransform(., app_crs)
 
-# Fortify muns for ggplot. Remove unnecessary columns to save memory
+# Fortify muns for ggplot.
 muns_f <- 
-  merge(ggplot2::fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0) %>%
-  dplyr::select(-c(namn, vaestontih, km2, vakiluku))
+  merge(ggplot2::fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0)
 
 # Islands in Helsinki Capital Region that are unreachable by car in PAAVO dataset
 unreachable_f <-
