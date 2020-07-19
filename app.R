@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 18.7.2020
+# 19.7.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -41,8 +41,9 @@ postal_path <- "pythonshinypostal.csv"
 
 # Spatial data paths
 suuraluepath <- "PKS_suuralue.kml"
-munsclippedpath <- "hcr_muns_clipped.shp"
 munspath <- "hcr_muns_sea.shp"
+othermunspath <- "other_muns.shp"
+unreachablepath <- "hcr_muns_unreachable.shp"
 
 # CSS data
 csspath <- "thesis_stats_vis_style.css"
@@ -168,26 +169,36 @@ suuralue_f <- suuralue_f[order(suuralue_f$Name), ]
 
 #### 3.2 Municipality borders --------------------------------------------------
 
-# Get municipality borders. Fortify SP DataFrame for ggplot. Remove unnecessary
-# columns to save memory.
+# Get municipality borders from shapefile.
 # Shapefile data is Regional population density 2012, Statistics Finland.
 # http://urn.fi/urn:nbn:fi:csc-kata00001000000000000226.
-muns_clipped <- 
-  rgdal::readOGR(munsclippedpath, stringsAsFactors = TRUE) %>%
+muns <- 
+  rgdal::readOGR(munspath, stringsAsFactors = TRUE) %>%
   sp::spTransform(., app_crs)
 
-# Fortify SP DataFrame for ggplot. Remove unnecessary columns to save memory
-muns_clipped_f <- merge(ggplot2::fortify(muns_clipped), 
-                        as.data.frame(muns_clipped), 
-                        by.x = "id", 
-                        by.y = 0) %>%
+# Fortify muns for ggplot. Remove unnecessary columns to save memory
+muns_f <- 
+  merge(ggplot2::fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0) %>%
   dplyr::select(-c(namn, vaestontih, km2, vakiluku))
+
+# Islands in Helsinki Capital Region that are unreachable by car in PAAVO dataset
+unreachable_f <-
+  rgdal::readOGR(unreachablepath, stringsAsFactors = TRUE) %>%
+  sp::spTransform(., app_crs) %>%
+  ggplot2::fortify(.)
+
+# Bordering municipalities. Does not require any of the shapefile attribute data.
+othermuns_f <-
+  rgdal::readOGR(othermunspath, stringsAsFactors = TRUE) %>%
+  sp::spTransform(., app_crs) %>%
+  ggplot2::fortify(.)
+
 
 
 #### 3.3 Annotation ------------------------------------------------------------
 
 # Annotate municipalities and subdivisions in ggplot2
-muns_cntr <- GetCentroids(muns_clipped_f, "nimi", "nimi")
+muns_cntr <- GetCentroids(muns_f, "nimi", "nimi")
 subdiv_cntr <- GetCentroids(suuralue_f, "Name", "Name")
 
 # Manually set better location for the annotation of Helsinki. Utilise
@@ -254,16 +265,6 @@ data <- SpatialPolygonsDataFrame(
 
 data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id", 
                 by.y = 0)
-
-# Get municipality borders from shapefile.
-muns <- 
-  rgdal::readOGR(munspath, stringsAsFactors = TRUE) %>%
-  sp::spTransform(., app_crs)
-
-# Fortify muns for ggplot. Remove unnecessary columns to save memory
-muns_f <- 
-  merge(fortify(muns), as.data.frame(muns), by.x = "id", by.y = 0) %>%
-  dplyr::select(-c(namn, vaestontih, km2, vakiluku))
 
 
 
@@ -1099,15 +1100,27 @@ server <- function(input, output, session){
                   scale = 0.04, 
                   symbol = 10)
     
-    # Plot municipality boundaries on the interactive map
+    # Plot PAAVO municipality boundaries on the interactive map
     if(input$show_muns == TRUE) {
-
-      g <- g + geom_polygon(data = muns_f,
+      
+      g <- g + geom_polygon(data = unreachable_f,
                             aes(long, lat, group = group),
-                            linetype = "solid",
-                            color = alpha("black", 0.9), 
+                            color = alpha("black", 0.6),
                             fill = "NA",
-                            size = 1.0)
+                            size = 0.2) +
+        
+        geom_polygon(data = othermuns_f,
+                     aes(long, lat, group = group),   
+                     color = alpha("black", 0.25),
+                     fill = "NA",
+                     size = 0.8) +
+        
+        geom_polygon(data = muns_f,
+                     aes(long, lat, group = group),
+                     linetype = "solid",
+                     color = alpha("black", 0.9), 
+                     fill = "NA",
+                     size = 1.0)
     }
     
     # Subdivision boundaries
@@ -1456,7 +1469,7 @@ ui <- shinyUI(fluidPage(
            "</div>",
            "</div>",
            "</div>",
-           "<p id='version-info'>Analysis app version 18.7.2020</p>"),
+           "<p id='version-info'>Analysis app version 19.7.2020</p>"),
       
       width = 3
     ),
