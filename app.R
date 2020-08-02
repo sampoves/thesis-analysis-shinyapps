@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 19.7.2020
+# 2.8.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -36,14 +36,14 @@ library(ggsn)
 
 
 # Python prepared data directories
-datapath <- "pythonshinyrecords.csv"
-postal_path <- "pythonshinypostal.csv"
+datapath <- "appdata/pythonshinyrecords.csv"
+postal_path <- "appdata/pythonshinypostal.csv"
 
 # Spatial data paths
-suuraluepath <- "PKS_suuralue.kml"
-munspath <- "hcr_muns_sea.shp"
-othermunspath <- "other_muns.shp"
-unreachablepath <- "hcr_muns_unreachable.shp"
+suuraluepath <- "appdata/PKS_suuralue.kml"
+munspath <- "appdata/hcr_muns_sea.shp"
+othermunspath <- "appdata/other_muns.shp"
+unreachablepath <- "appdata/hcr_muns_unreachable.shp"
 
 # CSS data
 csspath <- "thesis_stats_vis_style.css"
@@ -549,12 +549,14 @@ server <- function(input, output, session){
   
   #### 5.2.1 Download descriptive statistics ----
   output$dl_descri <- downloadHandler(
-    filename = paste("descriptives_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     input$resp, "-", input$expl, "_",
-                     format(Sys.time(), "%d-%m-%Y"), 
-                     ".csv",
-                     sep = ""),
+    filename = function() {
+      paste("descriptives_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".csv",
+            sep = "")
+      },
     
     content = function(file) {
       write.csv(desc_out, file)
@@ -630,13 +632,15 @@ server <- function(input, output, session){
                                     "kernel density\nestimate" = alpha("black", 0.4))) +
       guides(color = guide_legend(
         override.aes = list(color = c("darkgrey", "red", "blue"),
-                            linetype = c("solid", "longdash", "longdash")))) +
-      
-      # Conditional histogram bar labeling. No label for zero
-      stat_bin(binwidth = binwidth, 
-               geom = "text", 
-               aes(label = ifelse(..count.. > 0, ..count.., "")), 
-               vjust = -0.65)
+                            linetype = c("solid", "longdash", "longdash"))))
+    
+    # Conditional histogram bar labeling. No label for zero. Create the labeling
+    # separately for the histogram shown in the app and the histogram made for
+    # downloading. To my knowledge there is no other way to control the font size.
+    p_out <- p + stat_bin(binwidth = binwidth,
+                          geom = "text",
+                          aes(label = ifelse(..count.. > 0, ..count.., "")),
+                          vjust = -0.65)
     
     
     # Prepare the downloadable histogram. "hist_out" is brought global environment 
@@ -644,13 +648,21 @@ server <- function(input, output, session){
     hist_out <- LabelBuilder(p, input$expl, input$checkGroup, input$subdivGroup)
     hist_out <<- 
       hist_out + 
+      
+      # a larger font size for bar labeling
+      stat_bin(binwidth = binwidth,
+               geom = "text",
+               aes(label = ifelse(..count.. > 0, ..count.., "")),
+               size = 6,
+               vjust = -0.65) +
+      
       theme(legend.title = element_text(size = 23),
             legend.text = element_text(size = 22),
             axis.text = element_text(size = 19),
             axis.title = element_text(size = 22))
     
     # Render histogram
-    ggiraph(code = print(p),
+    ggiraph(code = print(p_out),
             width_svg = 16.7,
             height_svg = 6)
   })
@@ -658,13 +670,15 @@ server <- function(input, output, session){
   
   #### 5.3.1 Download histogram ----
   output$dl_hist <- downloadHandler(
-    filename = paste("hist_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     input$resp, "-", input$expl, "_",
-                     "binw", input$bin, "_",
-                     format(Sys.time(), "%d-%m-%Y"), 
-                     ".png",
-                     sep = ""),
+    filename = function() {
+      paste("hist_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            "binw", input$bin, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".png",
+            sep = "")
+      },
     
     content = function(file) {
       ggsave(plot = hist_out, file, height = 10, width = 26, dpi = 150)
@@ -753,12 +767,14 @@ server <- function(input, output, session){
   
   #### 5.4.1 Download barplot ----
   output$dl_barplot <- downloadHandler(
-    filename = paste("barplot_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     input$expl, "-", input$barplot, "_",
-                     format(Sys.time(), "%d-%m-%Y"),
-                     ".png",
-                     sep = ""),
+    filename = function() {
+      paste("barplot_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$expl, "-", input$barplot, "_",
+            format(Sys.time(), "%d-%m-%Y"),
+            ".png",
+            sep = "")
+      },
     
     content = function(file) {
       ggsave(plot = barplot_out, file, height = 10, width = 26, dpi = 150)
@@ -835,12 +851,14 @@ server <- function(input, output, session){
   
   #### 5.5.1 Download boxplot ----
   output$dl_boxplot <- downloadHandler(
-    filename = paste("boxplot_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     input$resp, "-", input$expl, "_",
-                     format(Sys.time(), "%d-%m-%Y"),
-                     ".png",
-                     sep = ""),
+    filename = function() {
+      paste("boxplot_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"),
+            ".png",
+            sep = "")
+      },
     
     content = function(file) {
       ggsave(plot = boxplot_out, file, height = 12, width = 26, dpi = 150)
@@ -875,12 +893,14 @@ server <- function(input, output, session){
   
   #### 5.6.1 Download levene test table ----
   output$dl_levene <- downloadHandler(
-    filename = paste("levene_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     input$resp, "-", input$expl, "_",
-                     format(Sys.time(), "%d-%m-%Y"), 
-                     ".csv",
-                     sep = ""),
+    filename = function() {
+      paste("levene_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".csv",
+            sep = "")
+      },
     
     content = function(file) {
       write.csv(levene_out, file)
@@ -917,12 +937,14 @@ server <- function(input, output, session){
   
   #### 5.7.1 Download One-way ANOVA table ----
   output$dl_anova <- downloadHandler(
-    filename = paste("oneway-anova_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     input$resp, "-", input$expl, "_",
-                     format(Sys.time(), "%d-%m-%Y"),
-                     ".csv",
-                     sep = ""),
+    filename = function() {
+      paste("oneway-anova_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"),
+            ".csv",
+            sep = "")
+      },
     
     content = function(file) {
       write.csv(anova_out, file)
@@ -954,12 +976,14 @@ server <- function(input, output, session){
   
   #### 5.8.1 Download Brown-Forsythe table ----
   output$dl_brown <- downloadHandler(
-    filename = paste("brownf_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     input$resp, "-", input$expl, "_",
-                     format(Sys.time(), "%d-%m-%Y"), 
-                     ".txt",
-                     sep = ""),
+    filename = function() {
+      paste("brownf_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            input$resp, "-", input$expl, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".txt",
+            sep = "")
+      },
     
     content = function(file) {
       cat(brown_out, file = file, sep = "\n")
@@ -1219,11 +1243,13 @@ server <- function(input, output, session){
   
   #### 5.9.1 Download interactive map ----
   output$dl_interactive <- downloadHandler(
-    filename = paste("interactive-map_",
-                     "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
-                     format(Sys.time(), "%d-%m-%Y"), 
-                     ".png",
-                     sep = ""),
+    filename = function() {
+      paste("interactive-map_",
+            "pmax", input$parktime_max, "-wmax", input$walktime_max, "_",
+            format(Sys.time(), "%d-%m-%Y"), 
+            ".png",
+            sep = "")
+      },
     
     content = function(file) {
       ggsave(plot = interactive_out, file, height = 16, width = 18, dpi = 150)
@@ -1468,7 +1494,7 @@ ui <- shinyUI(fluidPage(
            "</div>",
            "</div>",
            "</div>",
-           "<p id='version-info'>Analysis app version 19.7.2020</p>"),
+           "<p id='version-info'>Analysis app version 2.8.2020</p>"),
       
       width = 3
     ),
