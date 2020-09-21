@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 6.8.2020
+# 21.9.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
@@ -1494,7 +1494,7 @@ ui <- shinyUI(fluidPage(
            "</div>",
            "</div>",
            "</div>",
-           "<p id='version-info'>Analysis app version 6.8.2020</p>"),
+           "<p id='version-info'>Analysis app version 21.9.2020</p>"),
       
       width = 3
     ),
