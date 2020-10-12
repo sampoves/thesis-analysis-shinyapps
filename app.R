@@ -36,8 +36,8 @@ library(ggsn)
 
 
 # Python prepared data directories
-datapath <- "appdata/pythonshinyrecords.csv"
-postal_path <- "appdata/pythonshinypostal.csv"
+datapath <- "appdata/shinyrecords.csv"
+postal_path <- "appdata/shinypostal.csv"
 
 # Spatial data paths
 suuraluepath <- "appdata/PKS_suuralue.kml"
