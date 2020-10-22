@@ -8,6 +8,8 @@
   * [Analysis and visualisation output (Main panel)](#analysis-and-visualisation-output-main-panel)
 * [Known issues](#known-issues)
 * [Associated repositories](#associated-repositories)
+  * [Primary repositories](#primary-repositories)
+  * [Appendixes](#appendixes)
 
 ## About this application
 
@@ -39,6 +41,8 @@ I poured a massive amount of time into this application. It is extensive in its 
 
 ## Associated repositories
 
+### Primary repositories
+
 Please find the other GitHub repositories important to this thesis in the table below.
 
 | Repository | Description | Web deployment |
@@ -48,6 +52,8 @@ Please find the other GitHub repositories important to this thesis in the table 
 | https://github.com/sampoves/parking-in-helsinki-region | The web based survey application | Hosted by the author: **https://parking-survey.socialsawblade.fi** |
 | https://github.com/sampoves/thesis-visitors-shinyapps | shinyapps.io deployment of the visitors analysis application | shinyapps.io: **https://sampoves.shinyapps.io/visitors/** |
 | https://github.com/sampoves/thesis-comparison-shinyapps | shinyapps.io deployment of the travel time comparison application | shinyapps.io: **https://sampoves.shinyapps.io/comparison/** |
+
+### Appendixes
 
 During the process of creating the thesis, the following side products came into being:
 
