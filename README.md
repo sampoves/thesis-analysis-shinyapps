@@ -4,8 +4,8 @@
 
 * [About this application](#about-this-application)
 * [Application features](#application-features)
-  * [User input (Sidebar)](#user-input-(sidebar))
-  * [Analysis and visualisation output (Main panel)](#analysis-and-visualisation-output-(main-panel))
+  * [User input (Sidebar)](#user-input-sidebar)
+  * [Analysis and visualisation output (Main panel)](#analysis-and-visualisation-output-main-panel)
 * [Known issues](#known-issues)
 * [Associated repositories](#associated-repositories)
 
