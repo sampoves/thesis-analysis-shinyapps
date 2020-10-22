@@ -1,5 +1,7 @@
 # Research survey analysis and visualisation application, shinyapps.io deployment
 
+This data analysis application was developed for my University of Helsinki Master's thesis, *Parking private cars and spatial accessibility in Helsinki Capital Region – Parking time as a part of the total travel time*.
+
 ## Contents
 
 * [About this application](#about-this-application)
@@ -13,9 +15,7 @@
 
 ## About this application
 
-This data analysis application was developed for my University of Helsinki Master's thesis, *Parking private cars and spatial accessibility in Helsinki Capital Region – Parking time as a part of the total travel time*.
-
-For this thesis, an extensive amount of public participation GIS data was gathered. In order to answer my research questions, I ended up developing a set of analysis and visualisation tools, this repository containing one of the said analysis applications. In essence the application consists of wide variety of settings to select which parts of the survey data is examined at any moment, with a set of statistical and graphical outputs responding to the user's choices.
+For this Master's thesis, I collected an extensive amount of public participation GIS data. In order to answer the research questions, I ended up developing a set of analysis and visualisation tools, this repository containing one of the said analysis applications. In essence the application consists of wide variety of settings to select which parts of the survey data is examined at any moment, with a set of statistical and graphical outputs responding to the user's choices.
 
 **[The research survey analysis and visualisation application is available for viewing at shinyapps.io](https://sampoves.shinyapps.io/analysis/)**.
 
