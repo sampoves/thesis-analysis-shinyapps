@@ -4,7 +4,7 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 23.5.2020
+# 25.10.2020
 
 # Initialise
 library(onewaytests)
@@ -215,7 +215,7 @@ InterpolateGgplotColors <- function(plot_obj, active_items, palette_max_cols,
     myPal <- cols(length(active_items))
     result <- plot_obj + scale_fill_manual(values = myPal)
     
-    # Selected RColorBrewer palette works without any tricks
+  # Selected RColorBrewer palette works without any tricks
   } else {
     result <- plot_obj + scale_fill_brewer(palette = palettename)
   }
@@ -291,14 +291,16 @@ SigTableToShiny <- function(sigTable, hasHeading) {
   }
   
   # Get the location of the signif.star
-  signif_ncol <- ncol(read.table(textConnection(
-    capture.output(sigTable)[sigTablePosition]), 
-    fill = TRUE))
+  signif_ncol <- ncol(read.table(
+    textConnection(capture.output(sigTable)[sigTablePosition]), 
+    fill = TRUE,
+    stringsAsFactors = TRUE))
   
   # get signif.star
-  signif_star <- read.table(textConnection(
-    capture.output(sigTable)[sigTablePosition]), 
-    fill = TRUE)[[signif_ncol]]
+  signif_star <- read.table(
+    textConnection(capture.output(sigTable)[sigTablePosition]), 
+    fill = TRUE,
+    stringsAsFactors = TRUE)[[signif_ncol]]
   
   # Detect if signif_star is something else than factor. If so, the function
   # has picked up a value from probability column and the current analysis is 

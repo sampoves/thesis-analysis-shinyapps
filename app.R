@@ -4,12 +4,19 @@
 
 # "Parking of private cars and spatial accessibility in Helsinki Capital Region"
 # by Sampo Vesanen
-# 23.9.2020
+# 25.10.2020
 #
 # This is an interactive tool for analysing the results of my research survey.
 
 
+# TODO: look into \u04a6 (O), \u00E4 (a), and \u00f6 (o) to fix encoding
+#       hiccups
+
+
 # 1 Initialise -----------------------------------------------------------------
+
+# App version
+app_v <- "25.10.2020"
 
 # Libraries
 library(onewaytests)
@@ -196,7 +203,7 @@ othermuns_f <-
 
 #### 3.3 Annotation ------------------------------------------------------------
 
-# Annotate municipalities and subdivisions in ggplot2
+# Annotate municipalities and subdivisions for ggplot2
 muns_cntr <- GetCentroids(muns_f, "nimi", "nimi")
 subdiv_cntr <- GetCentroids(suuralue_f, "Name", "Name")
 
@@ -246,7 +253,8 @@ postal <-
   dplyr::select(c(2, 3, 6, 108:121)) %>%
   dplyr::mutate(artificial = artificial * 100)
 
-# Create column which reports the largest ykr zone in each postal code area
+# Create the column in "postal" which reports the largest ykr zone in each postal 
+# code area
 largest_ykr <- colnames(postal[, 5:11])[apply(postal[, 5:11], 1, which.max)]
 largest_ykr <- gsub("ykr_", "", largest_ykr)
 largest_ykr_no <- as.numeric(apply(postal[, 5:11], 1, max)) * 100
@@ -272,18 +280,18 @@ data_f <- merge(ggplot2::fortify(data), as.data.frame(data), by.x = "id",
 # This ShinyApp is a versatile tool to study the thesis survey data. One can
 # choose parameters with lots of freedom and exclude options as seen fit.
 
-server <- function(input, output, session){
+server <- function(input, output, session) {
   
   #### 5.1 Listener functions --------------------------------------------------
   
-  # 5.1.1 Listen to clear subdivs button. Resetting uses library shinyjs -------
+  # 5.1.1 Listen to clear subdivs button ---------------------------------------
   observeEvent(input$resetSubdivs, {
-    reset("subdivGroup")
+    shinyjs::reset("subdivGroup")
   })
   
   observeEvent(input$resetParkWalk, {
-    reset("parktime_max")
-    reset("walktime_max")
+    shinyjs::reset("parktime_max")
+    shinyjs::reset("walktime_max")
   })
   
   
@@ -297,7 +305,7 @@ server <- function(input, output, session){
   # currentdata() is the currently active rows of the original thesisdata 
   # DataFrame. Use currentdata() in the rest of the application to not interfere
   # with the original dataset.
-  currentdata <- reactive(
+  currentdata <- shiny::reactive(
     
     # Use ! negation to remove checkGroup and subdivGroup inputs from 
     # thesisdata.
@@ -313,7 +321,7 @@ server <- function(input, output, session){
   # medians for the values currently active in currentdata(). This is needed to 
   # make the interactive map tooltip values responsive to changes. In this phase,
   # we calculate the required data, the actual mapping part is in current_data_f()
-  currentpostal <- reactive({
+  currentpostal <- shiny::reactive({
     
     currentdata <- currentdata()
     
@@ -368,7 +376,7 @@ server <- function(input, output, session){
   # current_data_f() produces the currently needed interactive map out of the
   # data contained in currentpostal(). This is a copy of the code above, seen
   # in "Interactive map for ShinyApp". Please See code comments in the original.
-  current_data_f <- reactive({
+  current_data_f <- shiny::reactive({
     
     currentpostal <- currentpostal()
     
@@ -388,7 +396,7 @@ server <- function(input, output, session){
   })
   
   
-  observe({
+  shiny::observe({
     # 5.1.3 Detect changes in selectInput to modify available check boxes ------
     x <- input$expl
     
@@ -397,7 +405,7 @@ server <- function(input, output, session){
       "checkGroup", 
       label = NULL, 
       choiceNames = levels(thesisdata[, x]),
-      choiceValues = levels(thesisdata[, x]),)
+      choiceValues = levels(thesisdata[, x]), )
     
     
     # 5.1.4 Determine availability of barplot ----------------------------------
@@ -425,7 +433,7 @@ server <- function(input, output, session){
     }
     
     
-    # 5.1.6 A clumsy implementation to listen for too large jenks breaks -------
+    # 5.1.6 A clumsy implementation to listen for too large amounts of Jenks breaks ----
     inputpostal <- postal[!postal$kunta %in% c(input$kunta), ]
     
     if(input$karttacol == "jenks_artificial") {
@@ -446,9 +454,11 @@ server <- function(input, output, session){
     # Suppress warnings in the test.
     if(nrow(inputpostal) > 1) {
       classes_test <- suppressWarnings(
-        classInt::classIntervals(inputpostal[, datacol], n = input$jenks_n, style = "jenks"))
+        classInt::classIntervals(inputpostal[, datacol],
+                                 n = input$jenks_n,
+                                 style = "jenks"))
       
-      # object returned from classIntervals() has an attribute nobs which I
+      # Object returned from classIntervals() has an attribute nobs which I
       # use to detect cases where too large input$jenks_n is inputted to
       # CreateJenksColumn() function
       if(attributes(classes_test)$nobs < input$jenks_n) {
@@ -574,39 +584,44 @@ server <- function(input, output, session){
     inputdata <- currentdata()
     resp_vect <- inputdata[[resp_col]] # for vertical line labels
     
+    # These textGrobs determine the value shown at the bottom of vertical mean and
+    # median geom_vlines. Produce objects separately for the normal version and
+    # the downloadable versions to control font size.
+    meanval <- round(mean(resp_vect), 2)
+    medianval <- round(median(resp_vect), 2)
+    
+    meangrob <- grid::textGrob(label = meanval,
+                               hjust = -0.3,
+                               vjust = 1.25,
+                               gp = grid::gpar(cex = 1.2, col = "red"))
+    mediangrob <- grid::textGrob(label = medianval,
+                                 hjust = 2,
+                                 vjust = 1.25,
+                                 gp = grid::gpar(cex = 1.2, col = "blue"))
+    meangrob_out <- grid::textGrob(label = meanval,
+                                   hjust = -0.3,
+                                   vjust = 1.25,
+                                   gp = grid::gpar(cex = 2.2, col = "red"))
+    mediangrob_out <- grid::textGrob(label = medianval,
+                                     hjust = 2,
+                                     vjust = 1.25,
+                                     gp = grid::gpar(cex = 2.2, col = "blue"))
+    
     p <- ggplot(inputdata, aes(x = !!sym(resp_col))) + 
       geom_histogram(color = "black", fill = "grey", binwidth = binwidth) +
       xlab(paste(resp_col, "(min)")) +
       
       # Vertical lines for mean and median, respectively. Also display exact
-      # values with annotate_custom() and textGrobs.
+      # values with annotate_custom() and textGrobs. They are added a bit later.
       geom_vline(aes(xintercept = mean(!!sym(resp_col)),
                      color = "mean"),
                  linetype = "longdash", 
                  size = 1) +
-      annotation_custom(
-        grob = grid::textGrob(label = round(mean(resp_vect), 2), 
-                              hjust = -0.3,
-                              vjust = 1.25, 
-                              gp = grid::gpar(cex = 1.2, col = "red")),
-        ymin = 0,
-        ymax = 0,
-        xmin = round(mean(resp_vect), 2),
-        xmax = round(mean(resp_vect), 2)) +
       
       geom_vline(aes(xintercept = median(!!sym(resp_col)),
                      color = "median"),
                  linetype = "longdash", 
                  size = 1) +
-      annotation_custom(
-        grob = grid::textGrob(label = round(median(resp_vect), 2), 
-                              hjust = 2,
-                              vjust = 1.25, 
-                              gp = grid::gpar(cex = 1.2, col = "blue")),
-        ymin = 0,
-        ymax = 0,
-        xmin = round(median(resp_vect), 2),
-        xmax = round(median(resp_vect), 2)) +
       
       # This is kernel density estimate, a smoothed version of the histogram.
       # Usually geom_density() sets the scale for y axis, but here we will
@@ -617,19 +632,25 @@ server <- function(input, output, session){
                    show.legend = FALSE,
                    adjust = binwidth) +
       
-      theme(legend.title = element_text(size = 16),
+      # increase amount of ticks on x axis
+      scale_x_continuous(breaks = seq(0, max(resp_vect), by = 10)) +
+      
+      theme(legend.key.size = unit(1.5, "line"),
+            legend.title = element_text(size = 16),
             legend.text = element_text(size = 15),
-            legend.spacing.y = unit(0.3, "cm"),
-            legend.position = c(0.94, 0.84),
+            legend.spacing.y = unit(0.4, "cm"),
+            legend.position = c(0.92, 0.79),
             axis.text = element_text(size = 13),
             axis.title = element_text(size = 15),
             text = element_text(size = 13)) +
+      guides(shape = guide_legend(override.aes = list(size = 1.5)),
+             color = guide_legend(override.aes = list(size = 1.5))) +
       
-      # Build legend, override colors to get visible color for density. Also,
+      # Build legend, override colors to get a visible color for density. Also,
       # override linetype to get a solid line for density.
       scale_color_manual(name = paste("Legend for\n", resp_col, sep = ""), 
                          values = c(median = "blue", 
-                                    mean = "red", 
+                                    mean = "red",
                                     "kernel density\nestimate" = alpha("black", 0.4))) +
       guides(color = guide_legend(
         override.aes = list(color = c("darkgrey", "red", "blue"),
@@ -638,33 +659,87 @@ server <- function(input, output, session){
     # Conditional histogram bar labeling. No label for zero. Create the labeling
     # separately for the histogram shown in the app and the histogram made for
     # downloading. To my knowledge there is no other way to control the font size.
+    # Also add annotations for geom_vlines here.
     p_out <- p + stat_bin(binwidth = binwidth,
                           geom = "text",
                           aes(label = ifelse(..count.. > 0, ..count.., "")),
-                          vjust = -0.65)
+                          vjust = -0.65) +
+      annotation_custom(
+        grob = meangrob,
+        ymin = 0,
+        ymax = 0,
+        xmin = meanval,
+        xmax = meanval) +
+      
+      annotation_custom(
+        grob = mediangrob,
+        ymin = 0,
+        ymax = 0,
+        xmin = medianval,
+        xmax = medianval)
     
     
     # Prepare the downloadable histogram. "hist_out" is brought global environment 
-    # for download. Use larger fonts.
+    # for download below. Use larger fonts.
     hist_out <- LabelBuilder(p, input$expl, input$checkGroup, input$subdivGroup)
-    hist_out <<- 
+    hist_out <- 
       hist_out + 
       
       # a larger font size for bar labeling
       stat_bin(binwidth = binwidth,
                geom = "text",
                aes(label = ifelse(..count.. > 0, ..count.., "")),
-               size = 6,
+               size = 9.5,
                vjust = -0.65) +
+      # Larger fonts for geom_vline annotations
+      annotation_custom(
+        grob = meangrob_out,
+        ymin = 0,
+        ymax = 0,
+        xmin = meanval,
+        xmax = meanval) +
       
-      theme(legend.title = element_text(size = 23),
-            legend.text = element_text(size = 22),
-            axis.text = element_text(size = 19),
-            axis.title = element_text(size = 22))
+      annotation_custom(
+        grob = mediangrob_out,
+        ymin = 0,
+        ymax = 0,
+        xmin = medianval,
+        xmax = medianval) +
+      
+      theme(legend.key.size = unit(1.5, "line"),
+            legend.title = element_text(size = 32),
+            legend.text = element_text(size = 30),
+            legend.spacing.y = unit(0.6, "cm"),
+            legend.position = c(0.92, 0.78),
+            axis.text = element_text(size = 26),
+            axis.title = element_text(size = 29),
+            
+            legend.key = element_rect(size = 6),
+            legend.key.height = unit(1.5, "cm"),
+            legend.key.width = unit(1, "cm")) + 
+      
+      # this enables larger legend symbols. To my knowledge, I have to redefine
+      # the whole aes() here
+      guides(color = guide_legend(
+        override.aes = list(color = c("grey60", "red", "blue"),
+                            linetype = c("solid", "longdash", "longdash"),
+                            size = 2.5)))
+    
+    # This is a crude way of updating plot values. Depends on knowing the
+    # indices of plot items. Unpack plot with ggplot_build(), then reassemble
+    # with ggplot_gtable(). 
+    disassembled <- ggplot_build(hist_out)
+    disassembled$data[[1]]$size <- 1 # bars
+    disassembled$data[[2]]$size <- 1.5 #mean
+    disassembled$data[[3]]$size <- 1.5 #median
+    disassembled$data[[4]]$size <- 1.5 #density
+    
+    # "hist_out" is brought global environment for download
+    hist_out <<- ggplot_gtable(disassembled)
     
     # Render histogram
     ggiraph(code = print(p_out),
-            width_svg = 16.7,
+            width_svg = 17,
             height_svg = 6)
   })
   
@@ -715,7 +790,8 @@ server <- function(input, output, session){
     }
     
     tooltip_content <- paste0("<div id='app-tooltip'>",
-                              "<div>n=%s</div></div>")
+                              "<div>n=%s</div>",
+                              "</div>")
     
     plo <- 
       ggplot(inputdata, aes(x = get(expl_col), 
@@ -795,15 +871,15 @@ server <- function(input, output, session){
     legendnames <- levels(unique(inputdata[[expl_col]]))
     inputdata <- CalcBoxplotTooltip(inputdata, resp_col, expl_col)
     
-    tooltip_content <- paste0("<div style='font-size: 12px;'>",
+    tooltip_content <- paste0("<div id='app-tooltip'>",
                               "<div>Max = %s</div>",
-                              "<hr style='margin-top:2px; margin-bottom:2px;'>",
+                              "<hr id='tooltip-hr'>",
                               "<b>Interquartile<br/>Range (IQR)</b><br/>",
-                              "<div style='padding-top: 3px;'>Q3 = %s<br/>",
+                              "<div id='tooltip-div'>Q3 = %s<br/>",
                               "Med = %s<br/>",
                               "Q1 = %s</div>",
-                              "<hr style='margin-top:2px; margin-bottom:2px;'>",
-                              "<div style='padding-top: 3px;'>Min = %s</div>",
+                              "<hr id='tooltip-hr'>",
+                              "<div id='tooltip-div'>Min = %s</div>",
                               "</div")
     
     # ggplot2 plotting. Rotate labels if enough classes. Use scale_fill_hue()
@@ -1110,15 +1186,15 @@ server <- function(input, output, session){
                         name = legendname,
                         labels = labels,
                         na.value = "#ebebeb") +
-    
-    # Scale bar and north arrow
-    ggsn::scalebar(inputdata, 
-                   dist_unit = "km",
-                   dist = 2,
-                   st.dist = 0.01,
-                   st.size = 4, 
-                   height = 0.01, 
-                   transform = FALSE) +
+      
+      # Scale bar and north arrow
+      ggsn::scalebar(inputdata, 
+                     dist_unit = "km",
+                     dist = 2,
+                     st.dist = 0.01,
+                     st.size = 4, 
+                     height = 0.01, 
+                     transform = FALSE) +
       ggsn::north(inputdata, 
                   location = "topleft", 
                   scale = 0.04, 
@@ -1219,6 +1295,9 @@ server <- function(input, output, session){
       theme(legend.title = element_text(size = 15),
             legend.text = element_text(size = 14),
             legend.position = c(0.94, 0.84),
+            axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank(),
             plot.caption = element_text(size = 13, hjust = 0.5, face = "italic"))
     
     
@@ -1229,9 +1308,7 @@ server <- function(input, output, session){
     interactive_out <<- 
       interactive_out + 
       theme(legend.title = element_text(size = 17),
-            legend.text = element_text(size = 16),
-            axis.text = element_text(size = 14),
-            axis.title = element_text(size = 16))
+            legend.text = element_text(size = 16))
     
     # Render interactive map
     girafe(ggobj = g,
@@ -1430,7 +1507,7 @@ ui <- shinyUI(fluidPage(
       ### 6.2.7 Interactive map ----
       # Interactive map Jenks breaks options
       HTML("<div id='intmap-settings-link'>",
-           "<label>9 Interactive map",
+           "<label>8 Survey results on the study area map",
            "<a id='smalltext' href='#intmaplink'><i class='icon link' title='Go to the map'></i></a></label>",
            "<div id='contents'>"),
       checkboxGroupInput(
@@ -1496,7 +1573,8 @@ ui <- shinyUI(fluidPage(
            "</div>",
            "</div>",
            "</div>",
-           "<p id='version-info'>Analysis app version 23.9.2020</p>"),
+           paste("<p id='version-info'>Analysis application version", app_v, 
+                 "</p>")),
       
       width = 3
     ),
@@ -1534,7 +1612,9 @@ ui <- shinyUI(fluidPage(
       downloadLink("dl_hist",
                    label = HTML("<i class='icon file' title='Download hi-res version of this plot (png)'></i>")),
       HTML("</h3>"),
-      ggiraphOutput("hist", height = "400px"),
+      ggiraphOutput("hist", 
+                    width = "100%",
+                    height = "100%"),
       HTML("</div>"),
       hr(),
       
@@ -1555,7 +1635,9 @@ ui <- shinyUI(fluidPage(
       conditionalPanel(
         condition = 
           "input.expl == 'likert' || input.expl == 'parkspot' || input.expl == 'timeofday'",
-        ggiraphOutput("barplot_ord", height = "400px"),
+        ggiraphOutput("barplot_ord", 
+                      width = "100%",
+                      height = "100%"),
       ),
       HTML("</div>"),
       hr(),
@@ -1570,7 +1652,9 @@ ui <- shinyUI(fluidPage(
       downloadLink("dl_boxplot",
                    label = HTML("<i class='icon file' title='Download hi-res version of this plot (png)'></i>")),
       HTML("</h3>"),
-      ggiraphOutput("boxplot", height = "500px"),
+      ggiraphOutput("boxplot", 
+                    width = "100%",
+                    height = "100%"),
       HTML("</div>"),
       hr(),
       
@@ -1639,7 +1723,9 @@ ui <- shinyUI(fluidPage(
       downloadLink("dl_interactive",
                    label = HTML("<i class='icon file' title='Download hi-res version of this figure (png)'></i>")),
       HTML("</h3>"),
-      girafeOutput("interactive"),
+      girafeOutput("interactive", 
+                   width = "100%",
+                   height = "100%"),
       HTML("</div>"),
       hr(),
       
@@ -1662,7 +1748,7 @@ ui <- shinyUI(fluidPage(
            "(C) Finnish Environment Institute 2018. Retrieved 13.7.2020. License ",
            "<a href='https://creativecommons.org/licenses/by/4.0/deed.en'>CC BY 4.0</a>.",
            
-           "<br><a href='http://metatieto.ymparisto.fi:8080/geoportal/catalog/search/resource/details.page?uuid={B374BBB2-1EDF-4CF6-B11B-04E0017E9A26}'>Yhdyskuntarakenteen vyohykkeet 2017</a>",
+           "<br><a href='http://metatieto.ymparisto.fi:8080/geoportal/catalog/search/resource/details.page?uuid={B374BBB2-1EDF-4CF6-B11B-04E0017E9A26}'>Yhdyskuntarakenteen vy\u00F6hykkeet 2017</a>",
            "(C) Finnish Environment Institute 2019. Retrieved 27.6.2019. License ",
            "<a href='https://creativecommons.org/licenses/by/4.0/deed.en'>CC BY 4.0</a>.")
     )
