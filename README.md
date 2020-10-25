@@ -27,9 +27,37 @@ The thesis is available in PDF format at the Digital Repository of the Universit
 
 Lots of things to click (this section is WIP)
 
+#### Set maximum allowed values
+
+#### Currently active variables
+
+#### Histogram
+
+#### Distribution of ordinal variables
+
+#### Select inactive subdivisions
+
+#### Survey results on research area map
+
 ### Analysis and visualisation output (Main panel)
 
+#### Descriptive statistics
+
 Cool tables and graphs (this section is WIP)
+
+#### Histogram
+
+#### Distribution of ordinal variable
+
+#### Boxplot
+
+#### Test for homogeneity of variances (Levene's test)
+
+#### One-way analysis of variance (One-way ANOVA)
+
+#### Brown-Forsythe test
+
+#### Survey results on research area map
 
 ## Known issues
 
