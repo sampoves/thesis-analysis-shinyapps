@@ -1,4 +1,4 @@
-# Research survey analysis and visualisation application, shinyapps.io deployment
+# Research survey analysis and visualisation application, the shinyapps.io deployment
 
 This data analysis application was developed for my University of Helsinki Master's thesis, *Parking private cars and spatial accessibility in Helsinki Capital Region – Parking time as a part of the total travel time*.
 
