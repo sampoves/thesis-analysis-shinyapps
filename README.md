@@ -33,7 +33,7 @@ Affects all outputs.
 
 #### Currently active variables
 
-The user can here choose which response variable–explanatory variable combination they want to examine. The available variables are:
+Here the user chooses which response variable–explanatory variable combination they want to examine. The choice affects all outputs of the application. The available variables are:
 
 | Variable | Variable type | Description |
 | --- | --- | --- |
@@ -46,17 +46,72 @@ The user can here choose which response variable–explanatory variable combinat
 | ``ykr_zone`` | Explanatory | Created from spatial data: [Yhdyskuntarakenteen vyöhykkeet 2017](https://ckan.ymparisto.fi/dataset/%7B18AF2F7C-1D7E-4EBE-BB14-265FEAF91410%7D) |
 | ``subdiv`` | Explanatory | Created from spatial data: [Metropolitan area in districts](https://hri.fi/data/en_GB/dataset/paakaupunkiseudun-aluejakokartat) |
 
+For every active explanatory variable, the user also has the choice to exclude any value groups contained in that variable. For example, the user can choose to examine a subset of the survey research dataset in which ``likert`` only consists of *Extremely familiar*, *Moderately familiar*, and *Somewhat familiar*.
+
 Settings affect all outputs.
 
 #### 2 Histogram
 
+The user can select the binwidth for the output *2 Histogram*. Default is 2. The setting only affects the histogram.
+
 #### 3 Distribution of ordinal variables
+
+For the output *3 Distribution of ordinal variables*, the variables ``likert``, ``parkspot``, or ``timeofday`` can be placed on the x axis. In this setting, the user may choose the y axis for the output. All explanatory variables can be selected, the current selection for x axis excluded.
+
+This setting only affects the output *3 Distribution of ordinal variables*..
 
 #### Select inactive subdivisions
 
+The user can select to exclude any number of city subdivisions from one's examination of the research survey data. This selection affects the entire application. As discussed in the section **[Known issues](#known-issues)**, there is overlap with this setting and *Currently active variables*, if ``subdiv`` is selected as the explanatory variable. This is a sub-optimal design choice. The setting in *Select inactive subdivisions* always overrides the one set in *Currently active variables* and it is recommended that you do not mix the use of *Currently active variables* with explanatory variable ``subdiv`` and this setting.
+
+If you are unsure where each subdivision is located, take a look at *8 Survey results on study area map* for a graphical view into the study area and to whereabouts of subdivisions.
+
+The settings here affect all outputs.
+
 #### 8 Survey results on study area map
 
+Use these settings to shape the output *8 Survey results on study area map*. All settings here only affect the interactive map.
+
+##### Active municipalities
+
+Select which study area municipalities are active at any moment. Enables quick view into the entire area or a subset of the study area. The classification and the bounding box of the map will adapt accordingly to *active municipalities* choice.
+
+##### Jenks breaks parameter
+
+The type of classification in the interactive map in output *8 Survey results on study area map* is [Jenks natural breaks](https://en.wikipedia.org/wiki/Jenks_natural_breaks_optimization). Use this setting to choose which variable is to be depicted on the map:
+
+| Parameter in dropdown menu | Description |
+| --- | --- |
+| jenks_answer_count | Answer count |
+| jenks_park_mean | Searching for parking (``parktime``), mean |
+| jenks_park_median | Searching for parking (``parktime``), median |
+| jenks_walk_mean | Walking to destination (``walktime``), mean |
+| jenks_walk_median | Walking to destination (``walktime``), median |
+| jenks_artificial | Artificial surfaces (``artificial``) |
+
+##### Amount of classes
+
+Select the amount of Jenks breaks classes. Allowed value ranges from 2 to 8.
+
+##### Layer options
+
+Select feature labels and shape boundaries are visible. For postal code areas, the value for current *Jenks breaks parameter* can be shown (default is on). For municipalities, names can be shown as labels (default is off) and thick black outlines can be shown for boundaries (default is on). For subdivisions, labels can be shown (default is off) and outlines of medium thickness can be shown (default is off).
+
 ### Analysis and visualisation output (Main panel)
+
+#### Context buttons for outputs
+
+Above each output, an assortment of buttons can be found. The icons are of Font Awesome, from left to right: 
+
+| Icon name | Link to Font Awesome | Button function |
+| --- | --- | --- |
+| wrench | https://fontawesome.com/icons/wrench?style=solid | Go to output specific settings |
+| chart-bar | https://fontawesome.com/icons/chart-bar?style=solid | Go to *Set maximum allowed values (for response variables)* |
+| map-marked | https://fontawesome.com/icons/map-marked?style=solid | Go to *Select inactive subdivisions* |
+| file-download | https://fontawesome.com/icons/file-download?style=solid | Download output (csv, png, or txt) |
+| eye-slash/eye | https://fontawesome.com/icons/eye-slash?style=solid / https://fontawesome.com/icons/eye?style=solid | Hide element/Show element |
+
+The icons appear only where appropriate.
 
 #### 1 Descriptive statistics
 
@@ -65,6 +120,8 @@ Cool tables and graphs (this section is WIP)
 #### 2 Histogram
 
 #### 3 Distribution of ordinal variable
+
+This plot is active when ``likert``, ``parkspot``, or ``timeofday`` is selected as the explanatory (ordinal) variable.
 
 #### 4 Boxplot
 
