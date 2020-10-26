@@ -58,7 +58,7 @@ The user can select the binwidth for the output *2 Histogram*. Default is 2. The
 
 For the output *3 Distribution of ordinal variables*, the variables ``likert``, ``parkspot``, or ``timeofday`` can be placed on the x axis. In this setting, the user may choose the y axis for the output. All explanatory variables can be selected, the current selection for x axis excluded.
 
-This setting only affects the output *3 Distribution of ordinal variables*..
+This setting only affects the output *3 Distribution of ordinal variables*.
 
 #### Select inactive subdivisions
 
