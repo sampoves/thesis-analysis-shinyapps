@@ -25,39 +25,56 @@ The thesis is available in PDF format at the Digital Repository of the Universit
 
 ### User input (Sidebar)
 
-Lots of things to click (this section is WIP)
+#### Set maximum allowed values (for response variables)
 
-#### Set maximum allowed values
+User can freely set the values for ``parktime`` (survey question: *How long does it usually take for you to find a parking spot and park your car in this postal code area (in minutes)?*) and ``walktime`` (survey question: *How long does it usually take for you to walk from your parking spot to your destination in this postal code area (in minutes)?*). The default is 59 minutes for both, as this is the value used in the thesis.
+
+Affects all outputs.
 
 #### Currently active variables
 
-#### Histogram
+The user can here choose which response variable–explanatory variable combination they want to examine. The available variables are:
 
-#### Distribution of ordinal variables
+| Variable | Variable type | Description |
+| --- | --- | --- |
+| ``parktime`` | Response | survey question: *How long does it usually take for you to find a parking spot and park your car in this postal code area (in minutes)?* |
+| ``walktime`` | Response | survey question: *How long does it usually take for you to walk from your parking spot to your destination in this postal code area (in minutes)?* |
+| ``likert`` | Explanatory | survey question: *How familiar are you with this postal code area?* |
+| ``parkspot`` | Explanatory | survey question: *What kind of parking spot do you usually take in this postal code area?* |
+| ``timeofday`` | Explanatory | survey question: *At what time of the day do you usually park in this postal code area?* |
+| ``artificial`` | Explanatory | Created from spatial data: [CORINE Land Cover 2018](https://ckan.ymparisto.fi/dataset/%7B0B4B2FAC-ADF1-43A1-A829-70F02BF0C0E5%7D) |
+| ``ykr_zone`` | Explanatory | Created from spatial data: [Yhdyskuntarakenteen vyöhykkeet 2017](https://ckan.ymparisto.fi/dataset/%7B18AF2F7C-1D7E-4EBE-BB14-265FEAF91410%7D) |
+| ``subdiv`` | Explanatory | Created from spatial data: [Metropolitan area in districts](https://hri.fi/data/en_GB/dataset/paakaupunkiseudun-aluejakokartat) |
+
+Settings affect all outputs.
+
+#### 2 Histogram
+
+#### 3 Distribution of ordinal variables
 
 #### Select inactive subdivisions
 
-#### Survey results on research area map
+#### 8 Survey results on study area map
 
 ### Analysis and visualisation output (Main panel)
 
-#### Descriptive statistics
+#### 1 Descriptive statistics
 
 Cool tables and graphs (this section is WIP)
 
-#### Histogram
+#### 2 Histogram
 
-#### Distribution of ordinal variable
+#### 3 Distribution of ordinal variable
 
-#### Boxplot
+#### 4 Boxplot
 
-#### Test for homogeneity of variances (Levene's test)
+#### 5 Test for homogeneity of variances (Levene's test)
 
-#### One-way analysis of variance (One-way ANOVA)
+#### 6 One-way analysis of variance (One-way ANOVA)
 
-#### Brown-Forsythe test
+#### 7 Brown-Forsythe test
 
-#### Survey results on research area map
+#### 8 Survey results on research area map
 
 ## Known issues
 
