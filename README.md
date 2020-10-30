@@ -160,7 +160,7 @@ Please find the other GitHub repositories important to this thesis in the table 
 
 During the process of creating the thesis, the following side products came into being:
 
-| Repository | Description | Language(s) |
-| --- | --- | --- |
-| https://github.com/sampoves/leaflet-map-survey-point | A variant of the survey application. Users place points on the map instead of postal code areas | HTML, Javascript, PHP |
-| https://github.com/sampoves/msc-thesis-template | A barebones LaTeX thesis template in the style required by Department of Geosciences and Geography in the University of Helsinki | LaTeX |
+| Repository | Description |
+| --- | --- |
+| https://github.com/sampoves/leaflet-map-survey-point | A variant of the survey application. Users place points on the map instead of postal code areas |
+| https://github.com/sampoves/msc-thesis-template | A barebones LaTeX thesis template in the style required by Department of Geosciences and Geography in the University of Helsinki |
