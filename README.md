@@ -19,7 +19,7 @@ For this Master's thesis, I collected an extensive amount of public participatio
 
 **[The research survey analysis and visualisation application is available for viewing at shinyapps.io](https://sampoves.shinyapps.io/analysis/)**.
 
-The thesis is available in PDF format at the Digital Repository of the University of Helsinki: https://ethesis.helsinki.fi/en/ **(NB: the thesis not yet published)**. See the section [Associated repositories](#associated-repositories) for all GitHub repositories associated with this thesis.
+The thesis is available as PDF at the Digital Repository of the University of Helsinki: **http://urn.fi/URN:NBN:fi:hulib-202010304366**. See the section [Associated repositories](#associated-repositories) for all GitHub repositories associated with this thesis.
 
 ## Application features
 
