@@ -115,23 +115,43 @@ The icons appear only where appropriate.
 
 #### 1 Descriptive statistics
 
-Cool tables and graphs (this section is WIP)
+Describes and summarises features of the currently selected response variable and explanatory variable. Several different descriptives are provided. This table is useful to review what data is being analysed in the application at any moment.
 
 #### 2 Histogram
 
-#### 3 Distribution of ordinal variable
+View the frequency distribution of ``parktime`` or ``walktime`` data.
+
+#### 3 Distribution of ordinal variables
+
+View the frequency distribution of the explanatory variables using the groups of the survey questions ``likert``, ``parkspot``, or ``timeofday`` as the x axis.
+
+Hover the cursor over the bars to view individual *n* of the bars.
 
 This plot is active when ``likert``, ``parkspot``, or ``timeofday`` is selected as the explanatory (ordinal) variable.
 
 #### 4 Boxplot
 
+View explanatory variable groups through their quartiles. 
+
+Hover the cursor over the plot elements to view detailed quartile data.
+
 #### 5 Test for homogeneity of variances (Levene's test)
+
+This test was not employed in the final version of the Master's thesis.
 
 #### 6 One-way analysis of variance (One-way ANOVA)
 
+Detect if differences between explanatory variable groups are statistically significant. ANOVA requires a normality assumption and in this study I considered the assumption satisfied on the grounds of the *central limit theorem*.
+
 #### 7 Brown-Forsythe test
 
+This test was not employed in the final version of the Master's thesis.
+
 #### 8 Survey results on research area map
+
+View survey research descriptive statistics data on the study area map. 
+
+Hover the cursor over postal code areas to view area specific data. Also, when hovering over the map element, *ggiraph* zoom controls appear in the upper right corner. Use these to zoom in on any specific area of the map.
 
 ## Known issues
 
