@@ -117,6 +117,21 @@ The icons appear only where appropriate.
 
 Describes and summarises features of the currently selected response variable and explanatory variable. Several different descriptives are provided. This table is useful to review what data is being analysed in the application at any moment.
 
+
+| Statistic | Function used |
+| --- | --- |
+| n | ``length`` |
+| median | ``median`` |
+| mean | ``mean`` |
+| standard deviation | ``sd`` |
+| standard error | ``plotrix::std.error`` |
+| confidence intervals | ``Rmisc::CI`` |
+| minimum | ``min`` |
+| maximum | ``max`` |
+| quantiles | ``quantile`` |
+| skewness | ``moments::skewness`` |
+| kurtosis | ``moments::kurtosis`` |
+
 #### 2 Histogram
 
 View the frequency distribution of ``parktime`` or ``walktime`` data.
@@ -137,13 +152,19 @@ Hover the cursor over the plot elements to view detailed quartile data.
 
 #### 5 Test for homogeneity of variances (Levene's test)
 
+Uses ``car::leveneTest``.
+
 This test was not employed in the final version of the Master's thesis.
 
 #### 6 One-way analysis of variance (One-way ANOVA)
 
+Uses ``stats::aov``
+
 Detect if differences between explanatory variable groups are statistically significant. ANOVA requires a normality assumption and in this study I considered the assumption satisfied on the grounds of the *central limit theorem*.
 
 #### 7 Brown-Forsythe test
+
+Uses ``onewaytests::bf.test``.
 
 This test was not employed in the final version of the Master's thesis.
 
